@@ -70,7 +70,7 @@ button {
   align-items: flex-end;
   justify-content: space-between;
   gap: 12px;
-  padding: 8px 2px 16px;
+  padding: 2px 2px 16px;
 }
 
 .eyebrow {
@@ -90,6 +90,7 @@ h2 {
 h1 {
   font-size: 1.5rem;
   font-weight: 900;
+  padding-left: 5px;
 }
 
 h2 {
@@ -186,23 +187,28 @@ select:focus-visible {
 }
 
 .remaining-line {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  gap: 6px;
   margin-bottom: 12px;
+}
+
+.top-card-name {
+  display: inline-flex;
+  min-width: 0;
 }
 
 .remaining-text {
   min-width: 0;
   overflow-wrap: anywhere;
   color: var(--text);
-  font-size: 1.46rem;
+  font-size: 1.18rem;
   font-weight: 950;
 }
 
 .status-badge {
-  flex: 0 0 auto;
+  justify-self: end;
   border: 1px solid var(--line);
   border-radius: 999px;
   padding: 5px 9px;
@@ -248,6 +254,19 @@ label span {
   overflow-wrap: anywhere;
   text-overflow: clip;
   white-space: normal;
+}
+
+.card-name-badge {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  min-height: 30px;
+  border-radius: 6px;
+  padding: 4px 8px;
+  color: #ffffff;
+  font-size: 1.18rem;
+  font-weight: 950;
+  line-height: 1.2;
 }
 
 .balance-detail {
@@ -488,6 +507,19 @@ input[readonly] {
   color: var(--muted);
 }
 
+input[type="date"] {
+  display: block;
+  inline-size: 100%;
+  max-inline-size: 100%;
+  min-inline-size: 0;
+  overflow: hidden;
+}
+
+input[type="date"]::-webkit-date-and-time-value {
+  min-height: 1.2em;
+  text-align: left;
+}
+
 .field-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -556,7 +588,19 @@ input[readonly] {
   }
 
   .remaining-text {
-    font-size: 1.28rem;
+    font-size: 1.08rem;
+  }
+
+  .card-name-badge {
+    font-size: 1.08rem;
+  }
+
+  .remaining-line {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .remaining-text {
+    grid-column: 1;
   }
 
   .summary-grid {
