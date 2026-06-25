@@ -15,8 +15,7 @@
     <div class="app-shell">
       <header class="app-header">
         <div>
-          <p class="eyebrow">PayNowBiz</p>
-          <h1>선불 잔액</h1>
+          <h1>페이나우비즈 사용내역</h1>
         </div>
         <span id="saveStatus" class="save-status" aria-live="polite"></span>
       </header>
@@ -24,10 +23,7 @@
       <main>
         <section class="balance-section" aria-labelledby="activeTitle">
           <div class="section-heading">
-            <div>
-              <h2 id="activeTitle">사용 중</h2>
-              <p>승인번호별로 남은 금액을 확인합니다.</p>
-            </div>
+
           </div>
           <div id="activeList" class="balance-list"></div>
         </section>
@@ -151,12 +147,13 @@
           <span class="accent" aria-hidden="true"></span>
           <span class="card-summary">
             <span class="remaining-line">
+              <span class="top-card-name"></span>
               <strong class="remaining-text"></strong>
               <span class="status-badge"></span>
             </span>
             <span class="summary-grid">
               <span>
-                <small>카드</small>
+                <small>카드번호</small>
                 <b class="card-label"></b>
               </span>
 			  <span>
