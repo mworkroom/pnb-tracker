@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#f5f5f5" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="PayNowBiz" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <title>PayNowBiz 선불 잔액</title>
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="app-header">
+        <div>
+          <p class="eyebrow">PayNowBiz</p>
+          <h1>선불 잔액</h1>
+        </div>
+        <span id="saveStatus" class="save-status" aria-live="polite"></span>
+      </header>
+
+      <main>
+        <section class="balance-section" aria-labelledby="activeTitle">
+          <div class="section-heading">
+            <div>
+              <h2 id="activeTitle">사용 중인 잔액</h2>
+              <p>승인번호별로 남은 금액을 확인합니다.</p>
+            </div>
+          </div>
+          <div id="activeList" class="balance-list"></div>
+        </section>
+
+        <section class="completed-section" aria-labelledby="completedTitle">
+          <button
+            id="completedToggle"
+            class="completed-toggle"
+            type="button"
+            aria-expanded="false"
+          >
+            <span>
+              <strong id="completedTitle">완료된 잔액</strong>
+              <small id="completedSummary">0건</small>
+            </span>
+            <span class="toggle-mark" aria-hidden="true">열기</span>
+          </button>
+          <div id="completedList" class="balance-list completed-list" hidden></div>
+        </section>
+
+        <section class="new-panel" aria-labelledby="newTitle">
+          <div class="section-heading">
+            <div>
+              <h2 id="newTitle">새 선불 등록</h2>
+              <p>카드 정보는 승인번호 기록에 함께 저장됩니다.</p>
+            </div>
+          </div>
+
+          <form id="prepaymentForm" autocomplete="off" novalidate>
+            <label>
+              <span>1. 카드</span>
+              <select id="cardSelect" required></select>
+            </label>
+
+            <div id="registeredCardPreview" class="card-preview" aria-live="polite"></div>
+
+            <div id="unregisteredFields" class="unregistered-fields" hidden>
+              <div class="field-grid">
+                <label>
+                  <span>앞 4자리</span>
+                  <input
+                    id="unregisteredFirst4"
+                    class="digit-input"
+                    type="text"
+                    inputmode="numeric"
+                    pattern="[0-9]*"
+                    maxlength="4"
+                    placeholder="1234"
+                  />
+                </label>
+                <label>
+                  <span>뒤 4자리</span>
+                  <input
+                    id="unregisteredLast4"
+                    class="digit-input"
+                    type="text"
+                    inputmode="numeric"
+                    pattern="[0-9]*"
+                    maxlength="4"
+                    placeholder="5678"
+                  />
+                </label>
+              </div>
+              <label>
+                <span>카드 메모 선택</span>
+                <input
+                  id="unregisteredMemo"
+                  type="text"
+                  maxlength="24"
+                  placeholder="예: 이모 카드"
+                />
+              </label>
+            </div>
+
+            <label>
+              <span>2. 카드 번호</span>
+              <input id="cardNumberView" type="text" readonly aria-readonly="true" />
+            </label>
+
+            <label>
+              <span>3. 승인번호</span>
+              <input
+                id="approvalNumber"
+                type="text"
+                inputmode="numeric"
+                placeholder="앞자리 0도 그대로 입력"
+                required
+              />
+            </label>
+
+            <label>
+              <span>4. 승인일</span>
+              <input id="approvalDate" type="date" required />
+            </label>
+
+            <label>
+              <span>5. 승인금액</span>
+              <input
+                id="approvalAmount"
+                class="amount-input"
+                type="text"
+                inputmode="numeric"
+                pattern="[0-9]*"
+                placeholder="0"
+                required
+              />
+            </label>
+
+            <button class="primary-button" type="submit">새 잔액 저장</button>
+          </form>
+        </section>
+      </main>
+    </div>
+
+    <template id="balanceTemplate">
+      <article class="balance-card">
+        <button class="balance-toggle" type="button">
+          <span class="accent" aria-hidden="true"></span>
+          <span class="card-summary">
+            <span class="remaining-line">
+              <strong class="remaining-text"></strong>
+              <span class="status-badge"></span>
+            </span>
+            <span class="summary-grid">
+              <span>
+                <small>승인번호</small>
+                <b class="approval-number"></b>
+              </span>
+              <span>
+                <small>승인일</small>
+                <b class="approval-date"></b>
+              </span>
+              <span>
+                <small>승인금액</small>
+                <b class="approval-amount"></b>
+              </span>
+              <span>
+                <small>카드</small>
+                <b class="card-label"></b>
+              </span>
+            </span>
+          </span>
+        </button>
+        <div class="balance-detail"></div>
+      </article>
+    </template>
+
+    <script src="app.js" defer></script>
+  </body>
+</html>
