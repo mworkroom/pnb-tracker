@@ -448,12 +448,13 @@ function renderBalanceList(container, prepayments, emptyMessage = "사용 중인
     node.querySelector(".accent").style.backgroundColor = prepayment.cardColorSnapshot || DEFAULT_UNREGISTERED_COLOR;
     node.querySelector(".balance-toggle").dataset.balanceToggle = prepayment.id;
     node.querySelector(".balance-toggle").setAttribute("aria-expanded", String(isOpen));
+    node.querySelector(".top-card-name").innerHTML = renderCardNameBadge(prepayment);
     node.querySelector(".remaining-text").textContent = remainingText(remaining);
     node.querySelector(".status-badge").textContent = statusText;
     node.querySelector(".approval-number").textContent = prepayment.approvalNumber;
     node.querySelector(".approval-date").textContent = formatDate(prepayment.approvalDate);
     node.querySelector(".approval-amount").textContent = `${formatMoney(prepayment.approvalAmount)}원`;
-    node.querySelector(".card-label").textContent = cardSummaryName(prepayment);
+    node.querySelector(".card-label").textContent = cardDigitsText(prepayment);
 
     if (isOpen) {
       node.querySelector(".balance-detail").innerHTML = renderBalanceDetail(prepayment, used, remaining);
@@ -664,7 +665,25 @@ function cardSummaryName(prepayment) {
     prepayment.cardType === "unregistered" && prepayment.unregisteredCardMemo
       ? prepayment.unregisteredCardMemo
       : prepayment.cardNameSnapshot;
-  return `${name} · ${prepayment.cardFirst4Snapshot || "----"} / ${prepayment.cardLast4Snapshot || "----"}`;
+  return name;
+}
+
+function renderCardNameBadge(prepayment) {
+  const name = cardSummaryName(prepayment);
+  const color = safeAccentColor(prepayment.cardColorSnapshot);
+
+  return `<span class="card-name-badge" style="background-color: ${color}">${escapeHtml(name)}</span>`;
+}
+
+function cardDigitsText(prepayment) {
+  return `${prepayment.cardFirst4Snapshot || "----"} / ${prepayment.cardLast4Snapshot || "----"}`;
+}
+
+function safeAccentColor(value) {
+  const color = String(value || "");
+  if (/^#[0-9a-fA-F]{6}$/.test(color)) return color;
+  if (/^#[0-9a-fA-F]{3}$/.test(color)) return color;
+  return DEFAULT_UNREGISTERED_COLOR;
 }
 
 function maskCardNumber(first4, last4) {
