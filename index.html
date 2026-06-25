@@ -116,11 +116,21 @@
               />
             </label>
 
+            <label>
+              <span>6. 메모</span>
+              <textarea
+                id="prepaymentMemo"
+                maxlength="80"
+                rows="3"
+                placeholder="예: 병원 결제용, 6월 선결제"
+              ></textarea>
+            </label>
+
             <button class="primary-button" type="submit">새 잔액 저장</button>
           </form>
         </section>
 		
-		        <section class="completed-section" aria-labelledby="completedTitle">
+        <section class="completed-section" aria-labelledby="completedTitle">
           <button
             id="completedToggle"
             class="completed-toggle"
@@ -134,6 +144,22 @@
             <span class="toggle-mark" aria-hidden="true">열기</span>
           </button>
           <div id="completedList" class="balance-list completed-list" hidden></div>
+        </section>
+
+        <section class="completed-section cancelled-section" aria-labelledby="cancelledTitle">
+          <button
+            id="cancelledToggle"
+            class="completed-toggle"
+            type="button"
+            aria-expanded="false"
+          >
+            <span>
+              <strong id="cancelledTitle">등록 취소 내역</strong>
+              <small id="cancelledSummary">0건</small>
+            </span>
+            <span class="toggle-mark" aria-hidden="true">열기</span>
+          </button>
+          <div id="cancelledList" class="balance-list completed-list" hidden></div>
         </section>
 		
 		
@@ -175,6 +201,18 @@
         <div class="balance-detail"></div>
       </article>
     </template>
+
+    <div id="cancelDialog" class="dialog-backdrop" hidden>
+      <section class="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="cancelDialogTitle">
+        <h2 id="cancelDialogTitle">등록 취소</h2>
+        <p>이 선결제와 연결된 사용 내역이 모두 취소 처리됩니다.</p>
+        <p>정말 등록을 취소할까요?</p>
+        <div class="dialog-actions">
+          <button id="cancelDialogBack" class="secondary-button" type="button">돌아가기</button>
+          <button id="cancelDialogConfirm" class="danger-small-button" type="button">등록 취소</button>
+        </div>
+      </section>
+    </div>
 
     <script src="app.js" defer></script>
   </body>

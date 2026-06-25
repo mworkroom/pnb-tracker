@@ -35,6 +35,8 @@ const samplePrepayments = [
     cardLast4Snapshot: "5678",
     cardColorSnapshot: "#7c3aed",
     unregisteredCardMemo: "",
+    memo: "정기 주유 선결제",
+    status: "active",
     approvalNumber: "000123456789",
     approvalDate: "2026-06-15",
     approvalAmount: 100000,
@@ -50,6 +52,8 @@ const samplePrepayments = [
     cardLast4Snapshot: "2222",
     cardColorSnapshot: "#2563eb",
     unregisteredCardMemo: "",
+    memo: "",
+    status: "active",
     approvalNumber: "000555123400",
     approvalDate: "2026-06-10",
     approvalAmount: 50000,
@@ -65,6 +69,8 @@ const samplePrepayments = [
     cardLast4Snapshot: "0001",
     cardColorSnapshot: DEFAULT_UNREGISTERED_COLOR,
     unregisteredCardMemo: "이모 카드",
+    memo: "가족 심부름 결제용",
+    status: "active",
     approvalNumber: "009900112233",
     approvalDate: "2026-06-18",
     approvalAmount: 30000,
@@ -152,6 +158,8 @@ const state = {
   data: storage.load(),
   openPrepaymentId: null,
   completedOpen: false,
+  cancelledOpen: false,
+  pendingCancelPrepaymentId: null,
 };
 
 const moneyFormat = new Intl.NumberFormat("ko-KR");
@@ -162,6 +170,9 @@ const els = {
   completedToggle: document.querySelector("#completedToggle"),
   completedSummary: document.querySelector("#completedSummary"),
   completedList: document.querySelector("#completedList"),
+  cancelledToggle: document.querySelector("#cancelledToggle"),
+  cancelledSummary: document.querySelector("#cancelledSummary"),
+  cancelledList: document.querySelector("#cancelledList"),
   prepaymentForm: document.querySelector("#prepaymentForm"),
   cardSelect: document.querySelector("#cardSelect"),
   registeredCardPreview: document.querySelector("#registeredCardPreview"),
@@ -173,7 +184,11 @@ const els = {
   approvalNumber: document.querySelector("#approvalNumber"),
   approvalDate: document.querySelector("#approvalDate"),
   approvalAmount: document.querySelector("#approvalAmount"),
+  prepaymentMemo: document.querySelector("#prepaymentMemo"),
   balanceTemplate: document.querySelector("#balanceTemplate"),
+  cancelDialog: document.querySelector("#cancelDialog"),
+  cancelDialogBack: document.querySelector("#cancelDialogBack"),
+  cancelDialogConfirm: document.querySelector("#cancelDialogConfirm"),
 };
 
 init();
@@ -192,6 +207,17 @@ function bindEvents() {
     render();
   });
 
+  els.cancelledToggle.addEventListener("click", () => {
+    state.cancelledOpen = !state.cancelledOpen;
+    render();
+  });
+
+  els.cancelDialogBack.addEventListener("click", closeCancelDialog);
+  els.cancelDialogConfirm.addEventListener("click", confirmCancelPrepayment);
+  els.cancelDialog.addEventListener("click", (event) => {
+    if (event.target === els.cancelDialog) closeCancelDialog();
+  });
+
   els.cardSelect.addEventListener("change", updateCardFields);
   els.unregisteredFirst4.addEventListener("input", handleDigitsInput);
   els.unregisteredLast4.addEventListener("input", handleDigitsInput);
@@ -207,14 +233,17 @@ function bindEvents() {
 
   els.activeList.addEventListener("click", handleBalanceListClick);
   els.completedList.addEventListener("click", handleBalanceListClick);
+  els.cancelledList.addEventListener("click", handleBalanceListClick);
   els.activeList.addEventListener("submit", handleUsageSubmit);
   els.completedList.addEventListener("submit", handleUsageSubmit);
+  els.cancelledList.addEventListener("submit", handleUsageSubmit);
 }
 
 function render() {
   const groups = getGroupedPrepayments();
   renderBalanceList(els.activeList, groups.active);
   renderCompleted(groups.completed);
+  renderCancelled(groups.cancelled);
 }
 
 function renderCardOptions() {
@@ -251,6 +280,7 @@ function addPrepayment() {
   const approvalNumber = els.approvalNumber.value.trim();
   const approvalDate = els.approvalDate.value;
   const approvalAmount = parsePositiveInteger(els.approvalAmount.value);
+  const memo = els.prepaymentMemo.value.trim();
   const selected = getSelectedCard();
   const now = nowIso();
 
@@ -313,6 +343,8 @@ function addPrepayment() {
     approvalNumber,
     approvalDate,
     approvalAmount,
+    memo,
+    status: "active",
     createdAt: now,
     updatedAt: now,
   };
@@ -332,6 +364,19 @@ function handleBalanceListClick(event) {
     state.openPrepaymentId = state.openPrepaymentId === id ? null : id;
     render();
     return;
+  }
+
+  const prepaymentAction = event.target.closest("[data-prepayment-action]");
+  if (prepaymentAction) {
+    const id = prepaymentAction.dataset.prepaymentId;
+    if (prepaymentAction.dataset.prepaymentAction === "requestCancel") {
+      openCancelDialog(id);
+      return;
+    }
+    if (prepaymentAction.dataset.prepaymentAction === "restore") {
+      restorePrepaymentRegistration(id);
+      return;
+    }
   }
 
   const action = event.target.closest("[data-transaction-action]");
@@ -376,6 +421,7 @@ function handleUsageSubmit(event) {
   prepayment.updatedAt = now;
 
   const afterRemaining = getRemaining(prepayment.id);
+  syncPrepaymentStatus(prepayment);
   if (afterRemaining <= 0) {
     state.openPrepaymentId = null;
     state.completedOpen = false;
@@ -403,7 +449,10 @@ function setTransactionStatus(transactionId, action) {
   }
 
   transaction.updatedAt = now;
-  if (prepayment) prepayment.updatedAt = now;
+  if (prepayment) {
+    prepayment.updatedAt = now;
+    syncPrepaymentStatus(prepayment);
+  }
 
   if (prepayment && getRemaining(prepayment.id) > 0) {
     state.openPrepaymentId = prepayment.id;
@@ -411,6 +460,56 @@ function setTransactionStatus(transactionId, action) {
   }
 
   persist(action === "cancel" ? "취소됨" : "복구됨");
+  render();
+}
+
+function openCancelDialog(prepaymentId) {
+  state.pendingCancelPrepaymentId = prepaymentId;
+  els.cancelDialog.hidden = false;
+}
+
+function closeCancelDialog() {
+  state.pendingCancelPrepaymentId = null;
+  els.cancelDialog.hidden = true;
+}
+
+function confirmCancelPrepayment() {
+  const id = state.pendingCancelPrepaymentId;
+  closeCancelDialog();
+  if (!id) return;
+  cancelPrepaymentRegistration(id);
+}
+
+function cancelPrepaymentRegistration(prepaymentId) {
+  const prepayment = findPrepayment(prepaymentId);
+  if (!prepayment) return;
+
+  const now = nowIso();
+  prepayment.status = "cancelled";
+  prepayment.updatedAt = now;
+
+  state.data.transactions
+    .filter((transaction) => transaction.prepaymentId === prepaymentId)
+    .forEach((transaction) => {
+      transaction.status = "cancelled";
+      transaction.updatedAt = now;
+    });
+
+  state.openPrepaymentId = null;
+  state.cancelledOpen = true;
+  persist("등록 취소됨");
+  render();
+}
+
+function restorePrepaymentRegistration(prepaymentId) {
+  const prepayment = findPrepayment(prepaymentId);
+  if (!prepayment || prepayment.status !== "cancelled") return;
+
+  prepayment.status = getRemaining(prepayment.id) <= 0 ? "completed" : "active";
+  prepayment.updatedAt = nowIso();
+  state.openPrepaymentId = prepayment.id;
+  state.cancelledOpen = false;
+  persist("등록 복구됨");
   render();
 }
 
@@ -428,6 +527,20 @@ function renderCompleted(completed) {
   renderBalanceList(els.completedList, completed, "완료된 잔액이 없습니다.");
 }
 
+function renderCancelled(cancelled) {
+  els.cancelledSummary.textContent = `${cancelled.length}건`;
+  els.cancelledToggle.setAttribute("aria-expanded", String(state.cancelledOpen));
+  els.cancelledToggle.querySelector(".toggle-mark").textContent = state.cancelledOpen ? "닫기" : "열기";
+  els.cancelledList.hidden = !state.cancelledOpen;
+
+  if (!state.cancelledOpen) {
+    els.cancelledList.innerHTML = "";
+    return;
+  }
+
+  renderBalanceList(els.cancelledList, cancelled, "등록 취소된 내역이 없습니다.");
+}
+
 function renderBalanceList(container, prepayments, emptyMessage = "사용 중인 잔액이 없습니다.") {
   container.innerHTML = "";
 
@@ -441,8 +554,9 @@ function renderBalanceList(container, prepayments, emptyMessage = "사용 중인
     const isOpen = state.openPrepaymentId === prepayment.id;
     const remaining = getRemaining(prepayment.id);
     const used = getActiveUsed(prepayment.id);
-    const isCompleted = remaining <= 0;
-    const statusText = isCompleted ? "완료" : "사용 중";
+    const displayStatus = getPrepaymentStatus(prepayment);
+    const isCompleted = displayStatus === "completed";
+    const statusText = displayStatus === "cancelled" ? "취소" : isCompleted ? "완료" : "사용중";
 
     node.classList.toggle("is-open", isOpen);
     node.querySelector(".accent").style.backgroundColor = prepayment.cardColorSnapshot || DEFAULT_UNREGISTERED_COLOR;
@@ -468,16 +582,13 @@ function renderBalanceDetail(prepayment, used, remaining) {
   const transactions = state.data.transactions
     .filter((transaction) => transaction.prepaymentId === prepayment.id)
     .sort(sortTransactions);
-
-  return `
-    <div class="detail-info">
-      <div class="detail-row"><span>카드번호</span><strong>${escapeHtml(maskCardNumber(prepayment.cardFirst4Snapshot, prepayment.cardLast4Snapshot))}</strong></div>
-      <div class="detail-row"><span>승인번호</span><strong>${escapeHtml(prepayment.approvalNumber)}</strong></div>
-      <div class="detail-row"><span>승인일</span><strong>${formatDate(prepayment.approvalDate)}</strong></div>
-      <div class="detail-row"><span>승인금액</span><strong>${formatMoney(prepayment.approvalAmount)}원</strong></div>
-      <div class="detail-row"><span>사용합계</span><strong>${formatMoney(used)}원</strong></div>
-      <div class="detail-row remaining-detail"><span>남은금액</span><strong>${escapeHtml(remainingText(remaining))}</strong></div>
-    </div>
+  const memoRow = prepayment.memo
+    ? `<div class="detail-row memo-detail"><span>메모</span><strong>${escapeHtml(prepayment.memo)}</strong></div>`
+    : "";
+  const displayStatus = getPrepaymentStatus(prepayment);
+  const canUse = displayStatus !== "cancelled";
+  const usageForm = canUse
+    ? `
     <form class="usage-form" data-usage-form data-prepayment-id="${escapeHtml(prepayment.id)}" autocomplete="off">
       <label>
         <span>사용금액 추가</span>
@@ -495,12 +606,30 @@ function renderBalanceDetail(prepayment, used, remaining) {
         </div>
       </label>
     </form>
+  `
+    : "";
+  const registrationAction = canUse
+    ? `<button class="prepayment-cancel-button" type="button" data-prepayment-id="${escapeHtml(prepayment.id)}" data-prepayment-action="requestCancel">이 선결제 등록 취소</button>`
+    : `<button class="prepayment-restore-button" type="button" data-prepayment-id="${escapeHtml(prepayment.id)}" data-prepayment-action="restore">이 선결제 등록 복구</button>`;
+
+  return `
+    <div class="detail-info">
+      <div class="detail-row"><span>카드번호</span><strong>${escapeHtml(maskCardNumber(prepayment.cardFirst4Snapshot, prepayment.cardLast4Snapshot))}</strong></div>
+      <div class="detail-row"><span>승인번호</span><strong>${escapeHtml(prepayment.approvalNumber)}</strong></div>
+      <div class="detail-row"><span>승인일</span><strong>${formatDate(prepayment.approvalDate)}</strong></div>
+      <div class="detail-row"><span>승인금액</span><strong>${formatMoney(prepayment.approvalAmount)}원</strong></div>
+      ${memoRow}
+      <div class="detail-row"><span>사용합계</span><strong>${formatMoney(used)}원</strong></div>
+      <div class="detail-row remaining-detail"><span>남은금액</span><strong>${escapeHtml(remainingText(remaining))}</strong></div>
+    </div>
+    ${usageForm}
     <h3 class="history-title">거래 내역</h3>
-    ${renderTransactions(transactions)}
+    ${renderTransactions(transactions, displayStatus === "cancelled")}
+    <div class="prepayment-actions">${registrationAction}</div>
   `;
 }
 
-function renderTransactions(transactions) {
+function renderTransactions(transactions, actionsLocked = false) {
   if (!transactions.length) {
     return `<div class="empty-state">거래 내역이 없습니다.</div>`;
   }
@@ -511,6 +640,16 @@ function renderTransactions(transactions) {
       const action = isCancelled ? "restore" : "cancel";
       const label = isCancelled ? "복구" : "취소";
       const statusLabel = isCancelled ? "취소됨" : "사용";
+      const actionButton = actionsLocked
+        ? ""
+        : `
+          <button
+            class="transaction-action ${isCancelled ? "restore" : "cancel"}"
+            type="button"
+            data-transaction-id="${escapeHtml(transaction.id)}"
+            data-transaction-action="${action}"
+          >${label}</button>
+        `;
       return `
         <article class="transaction-item ${isCancelled ? "is-cancelled" : ""}">
           <div class="transaction-main">
@@ -520,12 +659,7 @@ function renderTransactions(transactions) {
               <span>${statusLabel}</span>
             </p>
           </div>
-          <button
-            class="transaction-action ${isCancelled ? "restore" : "cancel"}"
-            type="button"
-            data-transaction-id="${escapeHtml(transaction.id)}"
-            data-transaction-action="${action}"
-          >${label}</button>
+          ${actionButton}
         </article>
       `;
     })
@@ -542,9 +676,20 @@ function getGroupedPrepayments() {
   });
 
   return {
-    active: sorted.filter((prepayment) => getRemaining(prepayment.id) > 0),
-    completed: sorted.filter((prepayment) => getRemaining(prepayment.id) <= 0),
+    active: sorted.filter((prepayment) => getPrepaymentStatus(prepayment) === "active"),
+    completed: sorted.filter((prepayment) => getPrepaymentStatus(prepayment) === "completed"),
+    cancelled: sorted.filter((prepayment) => getPrepaymentStatus(prepayment) === "cancelled"),
   };
+}
+
+function getPrepaymentStatus(prepayment) {
+  if (prepayment.status === "cancelled") return "cancelled";
+  return getRemaining(prepayment.id) <= 0 ? "completed" : "active";
+}
+
+function syncPrepaymentStatus(prepayment) {
+  if (!prepayment || prepayment.status === "cancelled") return;
+  prepayment.status = getRemaining(prepayment.id) <= 0 ? "completed" : "active";
 }
 
 function getRemaining(prepaymentId) {
@@ -586,6 +731,7 @@ function resetPrepaymentForm() {
   els.approvalNumber.value = "";
   els.approvalDate.value = todayInputValue();
   els.approvalAmount.value = "";
+  els.prepaymentMemo.value = "";
   els.unregisteredFirst4.value = "";
   els.unregisteredLast4.value = "";
   els.unregisteredMemo.value = "";
@@ -643,6 +789,8 @@ function normalizePrepayment(prepayment) {
     approvalNumber: String(prepayment.approvalNumber || ""),
     approvalDate: String(prepayment.approvalDate || todayInputValue()),
     approvalAmount: Number(prepayment.approvalAmount) || 0,
+    memo: String(prepayment.memo || ""),
+    status: ["active", "completed", "cancelled"].includes(prepayment.status) ? prepayment.status : "active",
     createdAt: String(prepayment.createdAt || nowIso()),
     updatedAt: String(prepayment.updatedAt || nowIso()),
   };
@@ -676,7 +824,7 @@ function renderCardNameBadge(prepayment) {
 }
 
 function cardDigitsText(prepayment) {
-  return `${prepayment.cardFirst4Snapshot || "----"} / ${prepayment.cardLast4Snapshot || "----"}`;
+  return `${prepayment.cardFirst4Snapshot || "----"} - ${prepayment.cardLast4Snapshot || "----"}`;
 }
 
 function safeAccentColor(value) {
