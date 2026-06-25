@@ -12,18 +12,41 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <div class="app-shell">
+    <section id="authScreen" class="auth-screen">
+      <div class="auth-panel">
+        <h1>PayNowBiz Tracker</h1>
+        <p id="authMessage">공유 선불 잔액을 불러오려면 Google 계정으로 로그인하세요.</p>
+        <button id="googleLoginButton" class="primary-button" type="button">Google로 로그인</button>
+      </div>
+    </section>
+
+    <section id="setupScreen" class="auth-screen" hidden>
+      <div class="auth-panel">
+        <h1>PayNowBiz Tracker</h1>
+        <p id="setupMessage">이 계정은 아직 PayNowBiz Tracker에 등록되지 않았습니다.</p>
+        <button id="setupLogoutButton" class="secondary-button" type="button">로그아웃</button>
+      </div>
+    </section>
+
+    <div id="appShell" class="app-shell" hidden>
       <header class="app-header">
         <div>
           <h1>페이나우비즈 사용내역</h1>
+          <p id="userInfo" class="account-info"></p>
         </div>
-        <span id="saveStatus" class="save-status" aria-live="polite"></span>
+        <div class="header-actions">
+          <span id="saveStatus" class="save-status" aria-live="polite"></span>
+          <div class="account-actions">
+            <button id="adminButton" class="small-icon-button" type="button" hidden>관리</button>
+            <button id="logoutButton" class="small-icon-button" type="button">로그아웃</button>
+          </div>
+        </div>
       </header>
 
       <main>
         <section class="balance-section" aria-labelledby="activeTitle">
           <div class="section-heading">
-
+            <h2 id="activeTitle" class="sr-only">사용 중인 잔액</h2>
           </div>
           <div id="activeList" class="balance-list"></div>
         </section>
@@ -126,10 +149,10 @@
               ></textarea>
             </label>
 
-            <button class="primary-button" type="submit">새 잔액 저장</button>
+            <button id="prepaymentSubmit" class="primary-button" type="submit">새 잔액 저장</button>
           </form>
         </section>
-		
+
         <section class="completed-section" aria-labelledby="completedTitle">
           <button
             id="completedToggle"
@@ -138,7 +161,7 @@
             aria-expanded="false"
           >
             <span>
-              <strong id="completedTitle">사용 완료 내역</strong>
+              <strong id="completedTitle">최근 사용 완료 내역</strong>
               <small id="completedSummary">0건</small>
             </span>
             <span class="toggle-mark" aria-hidden="true">열기</span>
@@ -146,24 +169,49 @@
           <div id="completedList" class="balance-list completed-list" hidden></div>
         </section>
 
-        <section class="completed-section cancelled-section" aria-labelledby="cancelledTitle">
+        <section class="search-panel" aria-labelledby="searchTitle">
+          <div class="section-heading">
+            <div>
+              <h2 id="searchTitle">승인번호 검색</h2>
+            </div>
+          </div>
+          <label class="search-label">
+            <span>승인번호로 검색</span>
+            <div class="search-row">
+              <input
+                id="approvalSearchInput"
+                type="search"
+                inputmode="numeric"
+                placeholder="승인번호로 검색"
+                autocomplete="off"
+              />
+              <button id="approvalSearchClear" class="secondary-button clear-search-button" type="button" hidden>지우기</button>
+            </div>
+          </label>
+          <div id="searchSection" class="search-results" hidden>
+            <div class="section-subheading">
+              <strong>검색 결과</strong>
+              <small id="searchSummary"></small>
+            </div>
+            <div id="searchList" class="balance-list"></div>
+          </div>
+        </section>
+
+        <section class="completed-section archive-section" aria-labelledby="archiveTitle">
           <button
-            id="cancelledToggle"
+            id="archiveToggle"
             class="completed-toggle"
             type="button"
             aria-expanded="false"
           >
             <span>
-              <strong id="cancelledTitle">등록 취소 내역</strong>
-              <small id="cancelledSummary">0건</small>
+              <strong id="archiveTitle">이전 기록</strong>
+              <small id="archiveSummary"></small>
             </span>
             <span class="toggle-mark" aria-hidden="true">열기</span>
           </button>
-          <div id="cancelledList" class="balance-list completed-list" hidden></div>
+          <div id="archiveYearList" class="archive-year-list-wrap" hidden></div>
         </section>
-		
-		
-		
       </main>
     </div>
 
@@ -182,7 +230,7 @@
                 <small>카드번호</small>
                 <b class="card-label"></b>
               </span>
-			  <span>
+              <span>
                 <small>승인번호</small>
                 <b class="approval-number"></b>
               </span>
@@ -194,7 +242,6 @@
                 <small>승인금액</small>
                 <b class="approval-amount"></b>
               </span>
-
             </span>
           </span>
         </button>
@@ -205,7 +252,7 @@
     <div id="cancelDialog" class="dialog-backdrop" hidden>
       <section class="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="cancelDialogTitle">
         <h2 id="cancelDialogTitle">등록 취소</h2>
-        <p>이 선결제와 연결된 사용 내역이 모두 취소 처리됩니다.</p>
+        <p>이 선결제는 일반 목록에서 숨겨지고 관리자 화면에서 복구할 수 있습니다.</p>
         <p>정말 등록을 취소할까요?</p>
         <div class="dialog-actions">
           <button id="cancelDialogBack" class="secondary-button" type="button">돌아가기</button>
@@ -214,6 +261,19 @@
       </section>
     </div>
 
-    <script src="app.js" defer></script>
+    <div id="adminDialog" class="dialog-backdrop admin-backdrop" hidden>
+      <section class="admin-panel" role="dialog" aria-modal="true" aria-labelledby="adminDialogTitle">
+        <header class="admin-header">
+          <div>
+            <h2 id="adminDialogTitle">관리</h2>
+            <p>등록 카드, 취소 내역, 백업을 관리합니다.</p>
+          </div>
+          <button id="adminCloseButton" class="small-icon-button" type="button">닫기</button>
+        </header>
+        <div id="adminContent" class="admin-content"></div>
+      </section>
+    </div>
+
+    <script type="module" src="app.js"></script>
   </body>
 </html>
