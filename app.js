@@ -87,7 +87,6 @@ const els = {
   unregisteredFirst4: document.querySelector("#unregisteredFirst4"),
   unregisteredLast4: document.querySelector("#unregisteredLast4"),
   unregisteredMemo: document.querySelector("#unregisteredMemo"),
-  cardNumberView: document.querySelector("#cardNumberView"),
   approvalNumber: document.querySelector("#approvalNumber"),
   approvalDate: document.querySelector("#approvalDate"),
   approvalAmount: document.querySelector("#approvalAmount"),
@@ -417,7 +416,6 @@ function updateCardFields() {
 
   if (selected) {
     const cardNumber = maskCardNumber(selected.first4, selected.last4);
-    els.cardNumberView.value = cardNumber;
     els.registeredCardPreview.innerHTML = `<strong>${escapeHtml(selected.name)}</strong> ${escapeHtml(cardNumber)}`;
     return;
   }
@@ -425,7 +423,6 @@ function updateCardFields() {
   const first4 = onlyDigits(els.unregisteredFirst4.value).slice(0, 4);
   const last4 = onlyDigits(els.unregisteredLast4.value).slice(0, 4);
   const memo = els.unregisteredMemo.value.trim();
-  els.cardNumberView.value = first4 && last4 ? maskCardNumber(first4, last4) : "앞 4자리와 뒤 4자리를 입력";
   els.registeredCardPreview.innerHTML = memo
     ? `<strong>${escapeHtml(memo)}</strong> 등록되지 않은 카드`
     : "등록되지 않은 카드는 이 선불 기록에만 저장됩니다.";
@@ -491,18 +488,22 @@ async function addPrepayment() {
     };
   }
 
-  await runMutation(async () => {
-    const prepayment = await createPrepaymentRecord(state.membership, {
-      ...cardSnapshot,
-      approvalNumber,
-      approvalDate,
-      approvalAmount,
-      memo,
-    });
-    state.openPrepaymentId = prepayment.id;
-    state.completedOpen = false;
-    resetPrepaymentForm();
-  }, "저장됨");
+  await runMutation(
+    async () => {
+      const prepayment = await createPrepaymentRecord(state.membership, {
+        ...cardSnapshot,
+        approvalNumber,
+        approvalDate,
+        approvalAmount,
+        memo,
+      });
+      state.openPrepaymentId = prepayment.id;
+      state.completedOpen = false;
+      resetPrepaymentForm();
+    },
+    "저장됨",
+    { alertOnError: true },
+  );
 }
 
 function handleBalanceListClick(event) {
@@ -1146,7 +1147,7 @@ function getCardFormValues(form) {
   return { name, first4, last4, color };
 }
 
-async function runMutation(action, successMessage) {
+async function runMutation(action, successMessage, options = {}) {
   if (state.saving) return;
   setSaving(true);
   showStatus("저장 중...");
@@ -1163,6 +1164,9 @@ async function runMutation(action, successMessage) {
   } catch (error) {
     const message = getErrorMessage(error);
     showStatus(message);
+    if (options.alertOnError) {
+      window.alert(message);
+    }
     showAdminCardStatus(message);
   } finally {
     window.clearTimeout(slowTimer);
