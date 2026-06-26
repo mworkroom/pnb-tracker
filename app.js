@@ -27,6 +27,8 @@ import {
 const LEGACY_STORAGE_KEY = "paynowbiz-tracker:v1";
 const UNREGISTERED_VALUE = "__unregistered__";
 const DEFAULT_UNREGISTERED_COLOR = "#8a8a8a";
+const SLOW_REQUEST_MS = 4000;
+const AUTH_TIMEOUT_MS = 45000;
 
 const state = {
   user: null,
@@ -192,8 +194,16 @@ function bindEvents() {
 
 async function restoreSession() {
   renderSignedOut("로그인 상태를 확인하는 중입니다.", false);
+  const slowTimer = window.setTimeout(() => {
+    renderSignedOut("로그인 확인이 조금 오래 걸리고 있습니다. Supabase 응답을 기다리는 중입니다.", false);
+  }, SLOW_REQUEST_MS);
+
   try {
-    const { user } = await getCurrentSession();
+    const { user } = await withTimeout(
+      getCurrentSession(),
+      AUTH_TIMEOUT_MS,
+      "로그인 상태 확인 시간이 초과되었습니다. 새로고침 후 다시 시도해주세요.",
+    );
     if (!user) {
       resetSignedOutState();
       return;
@@ -201,15 +211,24 @@ async function restoreSession() {
     await loadForUser(user);
   } catch (error) {
     renderSignedOut(getErrorMessage(error), true);
+  } finally {
+    window.clearTimeout(slowTimer);
   }
 }
 
 async function loadForUser(user) {
   state.user = user;
   renderSignedOut("워크스페이스 권한을 확인하는 중입니다.", false);
+  const slowTimer = window.setTimeout(() => {
+    renderSignedOut("워크스페이스 권한 확인이 조금 오래 걸리고 있습니다. Supabase 응답을 기다리는 중입니다.", false);
+  }, SLOW_REQUEST_MS);
 
   try {
-    const membership = await getCurrentMembership(user);
+    const membership = await withTimeout(
+      getCurrentMembership(user),
+      AUTH_TIMEOUT_MS,
+      "워크스페이스 권한 확인 시간이 초과되었습니다. 새로고침 후 다시 로그인해주세요.",
+    );
     if (!membership) {
       state.membership = null;
       state.data = createEmptyData();
@@ -223,6 +242,8 @@ async function loadForUser(user) {
     await refreshWorkspaceData("불러옴", { silent: true });
   } catch (error) {
     renderSignedOut(getErrorMessage(error), true);
+  } finally {
+    window.clearTimeout(slowTimer);
   }
 }
 
@@ -1163,16 +1184,34 @@ async function runMutation(action, successMessage) {
   if (state.saving) return;
   setSaving(true);
   showStatus("저장 중...");
+  const slowTimer = window.setTimeout(() => {
+    showStatus("Supabase 저장 응답을 기다리는 중입니다...");
+  }, SLOW_REQUEST_MS);
+
   try {
     const dynamicMessage = await action();
     await refreshWorkspaceData(dynamicMessage || successMessage, { silent: true });
   } catch (error) {
     showStatus(getErrorMessage(error));
   } finally {
+    window.clearTimeout(slowTimer);
     setSaving(false);
     render();
     renderAdmin();
   }
+}
+
+function withTimeout(promise, timeoutMs, message) {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => {
+      reject(new Error(message));
+    }, timeoutMs);
+  });
+
+  return Promise.race([promise, timeout]).finally(() => {
+    window.clearTimeout(timeoutId);
+  });
 }
 
 function setSaving(saving) {
