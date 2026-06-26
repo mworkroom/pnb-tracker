@@ -513,7 +513,7 @@ function renderCardOptions() {
   const currentValue = els.cardSelect.value;
   els.cardSelect.innerHTML = [
     ...activeCards.map((card) => `<option value="${escapeHtml(card.id)}">${escapeHtml(card.name)}</option>`),
-    `<option value="${UNREGISTERED_VALUE}">등록되지 않은 카드</option>`,
+    `<option value="${UNREGISTERED_VALUE}">미등록 카드</option>`,
   ].join("");
 
   const availableValues = new Set([...activeCards.map((card) => card.id), UNREGISTERED_VALUE]);
@@ -542,8 +542,8 @@ function updateCardFields() {
   const last4 = onlyDigits(els.unregisteredLast4.value).slice(0, 4);
   const memo = els.unregisteredMemo.value.trim();
   els.registeredCardPreview.innerHTML = memo
-    ? `<strong>${escapeHtml(memo)}</strong> 등록되지 않은 카드`
-    : "등록되지 않은 카드는 이 항목에만 저장됩니다.";
+    ? `<strong>${escapeHtml(memo)}</strong> 미등록 카드`
+    : "등록되지 않은 카드는 이 항목에만 저장됩니다";
 }
 
 async function addPrepayment() {
@@ -598,7 +598,7 @@ async function addPrepayment() {
     cardSnapshot = {
       cardId: null,
       cardType: "unregistered",
-      cardNameSnapshot: "등록되지 않은 카드",
+      cardNameSnapshot: "미등록 카드",
       cardFirst4Snapshot: first4,
       cardLast4Snapshot: last4,
       cardColorSnapshot: DEFAULT_UNREGISTERED_COLOR,
