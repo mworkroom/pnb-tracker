@@ -91,6 +91,7 @@ const els = {
   unregisteredMemo: document.querySelector("#unregisteredMemo"),
   approvalNumber: document.querySelector("#approvalNumber"),
   approvalDate: document.querySelector("#approvalDate"),
+  approvalDateDisplay: document.querySelector("#approvalDateDisplay"),
   approvalAmount: document.querySelector("#approvalAmount"),
   prepaymentMemo: document.querySelector("#prepaymentMemo"),
   balanceTemplate: document.querySelector("#balanceTemplate"),
@@ -107,6 +108,7 @@ void init();
 async function init() {
   bindEvents();
   els.approvalDate.value = todayInputValue();
+  updateApprovalDateDisplay();
 
   if (!isSupabaseConfigured) {
     renderSignedOut("Supabase URL과 publishable key를 설정하면 Google 로그인을 사용할 수 있습니다.", false);
@@ -176,6 +178,8 @@ function bindEvents() {
   els.unregisteredFirst4.addEventListener("input", updateCardFields);
   els.unregisteredLast4.addEventListener("input", updateCardFields);
   els.unregisteredMemo.addEventListener("input", updateCardFields);
+  els.approvalDate.addEventListener("change", updateApprovalDateDisplay);
+  els.approvalDate.addEventListener("input", updateApprovalDateDisplay);
   els.approvalAmount.addEventListener("input", handleAmountInput);
 
   els.prepaymentForm.addEventListener("submit", (event) => {
@@ -1511,6 +1515,7 @@ function showStatus(message) {
 function resetPrepaymentForm() {
   els.approvalNumber.value = "";
   els.approvalDate.value = todayInputValue();
+  updateApprovalDateDisplay();
   els.approvalAmount.value = "";
   els.prepaymentMemo.value = "";
   els.unregisteredFirst4.value = "";
@@ -1586,6 +1591,17 @@ function formatDate(value) {
   const [year, month, day] = value.split("-");
   if (!year || !month || !day) return value;
   return `${year}.${month}.${day}`;
+}
+
+function formatDateForInputDisplay(value) {
+  if (!value) return "";
+  const [year, month, day] = value.split("-");
+  if (!year || !month || !day) return value;
+  return `${Number(year)}년 ${Number(month)}월 ${Number(day)}일`;
+}
+
+function updateApprovalDateDisplay() {
+  els.approvalDateDisplay.textContent = formatDateForInputDisplay(els.approvalDate.value);
 }
 
 function formatDateTime(value) {
