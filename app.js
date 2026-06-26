@@ -209,7 +209,7 @@ async function loadForUser(user) {
   renderSignedOut("워크스페이스 권한을 확인하는 중입니다.", false);
 
   try {
-    const membership = await getCurrentMembership();
+    const membership = await getCurrentMembership(user);
     if (!membership) {
       state.membership = null;
       state.data = createEmptyData();

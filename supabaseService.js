@@ -42,9 +42,9 @@ export function onAuthStateChange(callback) {
   return () => data.subscription.unsubscribe();
 }
 
-export async function getCurrentMembership() {
+export async function getCurrentMembership(currentUser = null) {
   const client = requireSupabase();
-  const user = await getAuthenticatedUser();
+  const user = currentUser ?? (await getAuthenticatedUser());
   const { data, error } = await client
     .from("workspace_members")
     .select("workspace_id, role, created_at, workspace:workspaces(id, name, created_at)")
