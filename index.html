@@ -107,12 +107,7 @@
             </div>
 
             <label>
-              <span>2. 카드 번호</span>
-              <input id="cardNumberView" type="text" readonly aria-readonly="true" />
-            </label>
-
-            <label>
-              <span>3. 승인번호</span>
+              <span>2. 승인번호</span>
               <input
                 id="approvalNumber"
                 type="text"
@@ -122,12 +117,12 @@
             </label>
 
             <label>
-              <span>4. 승인일</span>
+              <span>3. 승인일</span>
               <input id="approvalDate" type="date" required />
             </label>
 
             <label>
-              <span>5. 승인금액</span>
+              <span>4. 승인금액</span>
               <input
                 id="approvalAmount"
                 class="amount-input"
@@ -140,7 +135,7 @@
             </label>
 
             <label>
-              <span>6. 메모</span>
+              <span>5. 메모</span>
               <textarea
                 id="prepaymentMemo"
                 maxlength="80"
@@ -219,8 +214,11 @@
         <button class="balance-toggle" type="button">
           <span class="accent" aria-hidden="true"></span>
           <span class="card-summary">
-            <span class="remaining-line">
+            <span class="card-title-line">
               <span class="top-card-name"></span>
+              <span class="top-card-memo"></span>
+            </span>
+            <span class="remaining-line">
               <strong class="remaining-text"></strong>
               <span class="status-badge"></span>
             </span>
@@ -255,7 +253,7 @@
         <p>정말 등록을 취소할까요?</p>
         <div class="dialog-actions">
           <button id="cancelDialogBack" class="secondary-button" type="button">돌아가기</button>
-          <button id="cancelDialogConfirm" class="danger-small-button" type="button">등록 취소</button>
+          <button id="cancelDialogConfirm" class="danger-small-button" type="button">진짜 취소</button>
         </div>
       </section>
     </div>

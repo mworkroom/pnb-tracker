@@ -949,6 +949,9 @@ function renderBalanceList(container, prepayments, emptyMessage = "사용 중인
     node.querySelector(".balance-toggle").dataset.balanceToggle = prepayment.id;
     node.querySelector(".balance-toggle").setAttribute("aria-expanded", String(isOpen));
     node.querySelector(".top-card-name").innerHTML = renderCardNameBadge(prepayment);
+    const topCardMemo = node.querySelector(".top-card-memo");
+    topCardMemo.textContent = prepayment.memo?.trim() ?? "";
+    topCardMemo.hidden = !topCardMemo.textContent;
     node.querySelector(".remaining-text").textContent = remainingText(remaining);
     node.querySelector(".status-badge").textContent = statusText;
     node.querySelector(".approval-number").textContent = prepayment.approvalNumber;
