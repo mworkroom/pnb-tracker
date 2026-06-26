@@ -33,14 +33,9 @@
       <header class="app-header">
         <div>
           <h1>페이나우비즈 사용내역</h1>
-          <p id="userInfo" class="account-info"></p>
         </div>
         <div class="header-actions">
           <span id="saveStatus" class="save-status" aria-live="polite"></span>
-          <div class="account-actions">
-            <button id="adminButton" class="small-icon-button" type="button" hidden>관리</button>
-            <button id="logoutButton" class="small-icon-button" type="button">로그아웃</button>
-          </div>
         </div>
       </header>
 
@@ -211,6 +206,14 @@
           </section>
         </div>
       </main>
+
+      <footer class="account-footer" aria-label="계정 및 관리">
+        <p id="userInfo" class="account-info"></p>
+        <div class="account-actions">
+          <button id="adminButton" class="small-icon-button" type="button" hidden>관리</button>
+          <button id="logoutButton" class="small-icon-button" type="button">로그아웃</button>
+        </div>
+      </footer>
     </div>
 
     <template id="balanceTemplate">
