@@ -966,7 +966,7 @@ function renderAdmin() {
 function renderCreateCardForm() {
   const disabled = state.saving ? "disabled" : "";
   return `
-    <form class="admin-form" data-card-create-form autocomplete="off">
+    <form class="admin-form" data-card-create-form autocomplete="off" novalidate>
       <label>
         <span>카드 이름</span>
         <input name="name" type="text" maxlength="40" required ${disabled} />
@@ -993,7 +993,7 @@ function renderCreateCardForm() {
 function renderAdminCard(card) {
   const disabled = state.saving ? "disabled" : "";
   return `
-    <form class="admin-card-item" data-card-edit-form data-card-id="${escapeHtml(card.id)}" autocomplete="off">
+    <form class="admin-card-item" data-card-edit-form data-card-id="${escapeHtml(card.id)}" autocomplete="off" novalidate>
       <div class="admin-card-title">
         <span>${escapeHtml(card.name)} · ${escapeHtml(card.first4)}-${escapeHtml(card.last4)}</span>
         <span class="status-pill ${card.active ? "active" : "inactive"}">${card.active ? "활성" : "비활성"}</span>
