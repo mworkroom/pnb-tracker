@@ -35,6 +35,7 @@ const state = {
   membership: null,
   data: createEmptyData(),
   adminCancelledPrepayments: [],
+  adminCardStatus: "",
   openPrepaymentId: null,
   completedOpen: false,
   archiveOpen: false,
@@ -259,6 +260,7 @@ function resetSignedOutState() {
   state.membership = null;
   state.data = createEmptyData();
   state.adminCancelledPrepayments = [];
+  state.adminCardStatus = "";
   state.openPrepaymentId = null;
   state.completedOpen = false;
   state.archiveOpen = false;
@@ -961,6 +963,7 @@ function renderAdmin() {
     <section class="admin-section">
       <h3>카드 관리</h3>
       ${renderCreateCardForm()}
+      <p class="metadata" data-admin-card-status aria-live="polite">${escapeHtml(state.adminCardStatus)}</p>
       <div class="admin-card-list">
         ${state.data.cards.length ? state.data.cards.map(renderAdminCard).join("") : `<div class="empty-state">등록된 카드가 없습니다.</div>`}
       </div>
@@ -1105,6 +1108,7 @@ function handleAdminSubmit(event) {
 
   if (createForm) {
     void runMutation(async () => {
+      showAdminCardStatus("카드 저장을 요청했습니다. Supabase 응답을 기다리는 중입니다...");
       await createCard(state.membership, getCardFormValues(createForm));
       createForm.reset();
     }, "카드 추가됨");
@@ -1112,6 +1116,7 @@ function handleAdminSubmit(event) {
   }
 
   void runMutation(async () => {
+    showAdminCardStatus("카드 수정을 요청했습니다. Supabase 응답을 기다리는 중입니다...");
     await updateCard(state.membership, editForm.dataset.cardId, getCardFormValues(editForm));
   }, "카드 수정됨");
 }
@@ -1171,7 +1176,9 @@ async function importLegacyLocalStorage() {
     return;
   }
 
-  const ok = window.confirm("기존 localStorage 데이터를 현재 공유 워크스페이스로 가져올까요? 중복 승인번호가 있으면 중단됩니다.");
+  const ok = window.confirm(
+    "기존 localStorage 데이터를 현재 공유 워크스페이스로 가져올까요? 같은 카드, 승인번호, 승인일자, 금액의 선결제가 있으면 중단됩니다.",
+  );
   if (!ok) return;
 
   await runMutation(async () => {
@@ -1199,13 +1206,26 @@ async function runMutation(action, successMessage) {
   try {
     const dynamicMessage = await action();
     await refreshWorkspaceData(dynamicMessage || successMessage, { silent: true });
+    if (successMessage) {
+      showAdminCardStatus(dynamicMessage || successMessage);
+    }
   } catch (error) {
-    showStatus(getErrorMessage(error));
+    const message = getErrorMessage(error);
+    showStatus(message);
+    showAdminCardStatus(message);
   } finally {
     window.clearTimeout(slowTimer);
     setSaving(false);
     render();
     renderAdmin();
+  }
+}
+
+function showAdminCardStatus(message) {
+  state.adminCardStatus = message;
+  const status = document.querySelector("[data-admin-card-status]");
+  if (status) {
+    status.textContent = message;
   }
 }
 
@@ -1564,7 +1584,7 @@ function isAdmin() {
 function getErrorMessage(error) {
   const message = String(error?.message || error || "");
   if (error?.code === "23505" || message.includes("duplicate key")) {
-    return "이미 등록된 승인번호입니다.";
+    return "이미 같은 카드, 승인번호, 승인일자, 금액의 선결제가 등록되어 있습니다.";
   }
   if (message.includes("row-level security") || message.includes("permission denied")) {
     return "권한이 없어 저장할 수 없습니다.";

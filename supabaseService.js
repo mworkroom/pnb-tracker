@@ -8,6 +8,7 @@ const PREPAYMENT_SELECT =
 const TRANSACTION_SELECT =
   "id, workspace_id, prepayment_id, amount, transaction_date, status, created_by, created_at, updated_at";
 const RECENT_COMPLETED_MONTHS = 12;
+const RECENT_APPROVAL_DUPLICATE_MONTHS = 12;
 
 export async function getCurrentSession() {
   const client = requireSupabase();
@@ -203,6 +204,7 @@ export async function createPrepayment(membership, input) {
   requireMembership(membership);
   const client = requireSupabase();
   const user = await getAuthenticatedUser();
+  await ensureNoRecentApprovalDuplicate(client, membership.workspaceId, input.approvalNumber);
   const row = {
     workspace_id: membership.workspaceId,
     card_id: input.cardId,
@@ -370,22 +372,24 @@ export async function importLegacyData(membership, legacyData) {
   const legacyTransactions = normalizeLegacyTransactions(legacyData.transactions);
   applyLegacyActivityDates(legacyPrepayments, legacyTransactions);
 
-  const approvalNumbers = legacyPrepayments.map((item) => item.approvalNumber);
-  const uniqueApprovalNumbers = new Set(approvalNumbers);
-  if (uniqueApprovalNumbers.size !== approvalNumbers.length) {
-    throw new Error("기존 localStorage 데이터 안에 중복 승인번호가 있습니다.");
+  const duplicateKeys = legacyPrepayments.map(prepaymentDuplicateKey);
+  const uniqueDuplicateKeys = new Set(duplicateKeys);
+  if (uniqueDuplicateKeys.size !== duplicateKeys.length) {
+    throw new Error("기존 localStorage 데이터 안에 같은 카드, 승인번호, 승인일자, 금액의 중복 선결제가 있습니다.");
   }
 
+  const approvalNumbers = [...new Set(legacyPrepayments.map((item) => item.approvalNumber))];
   if (approvalNumbers.length) {
-    const { data: duplicates, error } = await client
+    const { data: existingPrepayments, error } = await client
       .from("prepayments")
-      .select("approval_number")
+      .select("card_first4_snapshot, card_last4_snapshot, approval_number, approval_date, approval_amount")
       .eq("workspace_id", membership.workspaceId)
       .in("approval_number", approvalNumbers);
 
     if (error) throw error;
-    if ((duplicates ?? []).length) {
-      throw new Error("이미 Supabase에 있는 승인번호가 있어 가져오기를 중단했습니다.");
+    const existingKeys = new Set((existingPrepayments ?? []).map(prepaymentRowDuplicateKey));
+    if (duplicateKeys.some((key) => existingKeys.has(key))) {
+      throw new Error("이미 Supabase에 같은 카드, 승인번호, 승인일자, 금액의 선결제가 있어 가져오기를 중단했습니다.");
     }
   }
 
@@ -516,6 +520,31 @@ function requireAdmin(membership) {
   if (membership.role !== "admin") {
     throw new Error("관리자 권한이 필요합니다.");
   }
+}
+
+async function ensureNoRecentApprovalDuplicate(client, workspaceId, approvalNumber) {
+  const recentSince = getRecentApprovalDuplicateCutoff();
+  const { data, error } = await client
+    .from("prepayments")
+    .select("approval_number, approval_date, approval_amount, card_name_snapshot, card_first4_snapshot, card_last4_snapshot, status")
+    .eq("workspace_id", workspaceId)
+    .eq("approval_number", approvalNumber)
+    .gte("approval_date", recentSince)
+    .order("approval_date", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  if (error) throw error;
+  const duplicate = data?.[0];
+  if (!duplicate) return;
+
+  const cardLabel = `${duplicate.card_name_snapshot} ${duplicate.card_first4_snapshot}-${duplicate.card_last4_snapshot}`;
+  const amount = Number(duplicate.approval_amount).toLocaleString("ko-KR");
+  throw new Error(
+    `최근 12개월 안에 같은 승인번호가 이미 있습니다. 기존 내역: ${cardLabel}, ${duplicate.approval_date}, ${amount}원${
+      duplicate.status === "cancelled" ? " (등록 취소됨)" : ""
+    }`,
+  );
 }
 
 function throwIfError(error) {
@@ -708,6 +737,32 @@ function getRecentCutoffIso() {
   const cutoff = new Date();
   cutoff.setMonth(cutoff.getMonth() - RECENT_COMPLETED_MONTHS);
   return cutoff.toISOString();
+}
+
+function getRecentApprovalDuplicateCutoff() {
+  const cutoff = new Date();
+  cutoff.setMonth(cutoff.getMonth() - RECENT_APPROVAL_DUPLICATE_MONTHS);
+  return cutoff.toISOString().slice(0, 10);
+}
+
+function prepaymentDuplicateKey(prepayment) {
+  return [
+    prepayment.cardFirst4Snapshot,
+    prepayment.cardLast4Snapshot,
+    prepayment.approvalNumber,
+    prepayment.approvalDate,
+    String(prepayment.approvalAmount),
+  ].join("|");
+}
+
+function prepaymentRowDuplicateKey(row) {
+  return [
+    row.card_first4_snapshot,
+    row.card_last4_snapshot,
+    row.approval_number,
+    row.approval_date,
+    String(row.approval_amount),
+  ].join("|");
 }
 
 function onlyDigits(value) {
