@@ -57,6 +57,7 @@ const els = {
   authScreen: document.querySelector("#authScreen"),
   authMessage: document.querySelector("#authMessage"),
   googleLoginButton: document.querySelector("#googleLoginButton"),
+  authLogoutButton: document.querySelector("#authLogoutButton"),
   setupScreen: document.querySelector("#setupScreen"),
   setupMessage: document.querySelector("#setupMessage"),
   setupLogoutButton: document.querySelector("#setupLogoutButton"),
@@ -127,6 +128,9 @@ async function init() {
 function bindEvents() {
   els.googleLoginButton.addEventListener("click", () => {
     void handleGoogleLogin();
+  });
+  els.authLogoutButton.addEventListener("click", () => {
+    void handleLogout();
   });
   els.logoutButton.addEventListener("click", () => {
     void handleLogout();
@@ -218,9 +222,11 @@ async function restoreSession() {
 
 async function loadForUser(user) {
   state.user = user;
-  renderSignedOut("워크스페이스 권한을 확인하는 중입니다.", false);
+  renderSignedOut("워크스페이스 권한을 확인하는 중입니다.", false, { canLogout: true });
   const slowTimer = window.setTimeout(() => {
-    renderSignedOut("워크스페이스 권한 확인이 조금 오래 걸리고 있습니다. Supabase 응답을 기다리는 중입니다.", false);
+    renderSignedOut("워크스페이스 권한 확인이 조금 오래 걸리고 있습니다. Supabase 응답을 기다리는 중입니다.", false, {
+      canLogout: true,
+    });
   }, SLOW_REQUEST_MS);
 
   try {
@@ -266,7 +272,7 @@ function resetSignedOutState() {
   renderSignedOut("공유 선불 잔액을 불러오려면 Google 계정으로 로그인하세요.", true);
 }
 
-function renderSignedOut(message, canLogin) {
+function renderSignedOut(message, canLogin, options = {}) {
   els.authScreen.hidden = false;
   els.setupScreen.hidden = true;
   els.appShell.hidden = true;
@@ -274,6 +280,8 @@ function renderSignedOut(message, canLogin) {
   els.authMessage.textContent = message;
   els.googleLoginButton.hidden = !canLogin;
   els.googleLoginButton.disabled = !canLogin;
+  els.authLogoutButton.hidden = !options.canLogout;
+  els.authLogoutButton.disabled = !options.canLogout;
 }
 
 function showSetupMessage() {

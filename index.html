@@ -7,7 +7,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="PayNowBiz" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <title>PayNowBiz 선불 잔액</title>
+    <title>페이나우비즈 사용내역</title>
     <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png" />
     <link rel="stylesheet" href="styles.css" />
   </head>
@@ -17,6 +17,7 @@
         <h1>PayNowBiz Tracker</h1>
         <p id="authMessage">공유 선불 잔액을 불러오려면 Google 계정으로 로그인하세요.</p>
         <button id="googleLoginButton" class="primary-button" type="button">Google로 로그인</button>
+        <button id="authLogoutButton" class="secondary-button" type="button" hidden>로그아웃 후 다시 로그인</button>
       </div>
     </section>
 
@@ -95,12 +96,12 @@
                 </label>
               </div>
               <label>
-                <span>카드 메모 선택</span>
+                <span>카드 별명 선택</span>
                 <input
                   id="unregisteredMemo"
                   type="text"
                   maxlength="24"
-                  placeholder="예: 이모 카드"
+                  placeholder="예: 복태 카드"
                 />
               </label>
             </div>
@@ -116,7 +117,6 @@
                 id="approvalNumber"
                 type="text"
                 inputmode="numeric"
-                placeholder="앞자리 0도 그대로 입력"
                 required
               />
             </label>
@@ -145,7 +145,6 @@
                 id="prepaymentMemo"
                 maxlength="80"
                 rows="3"
-                placeholder="예: 병원 결제용, 6월 선결제"
               ></textarea>
             </label>
 
@@ -252,7 +251,7 @@
     <div id="cancelDialog" class="dialog-backdrop" hidden>
       <section class="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="cancelDialogTitle">
         <h2 id="cancelDialogTitle">등록 취소</h2>
-        <p>이 선결제는 일반 목록에서 숨겨지고 관리자 화면에서 복구할 수 있습니다.</p>
+        <p>이 내역은 관리자 화면에서만 복구할 수 있습니다.</p>
         <p>정말 등록을 취소할까요?</p>
         <div class="dialog-actions">
           <button id="cancelDialogBack" class="secondary-button" type="button">돌아가기</button>
