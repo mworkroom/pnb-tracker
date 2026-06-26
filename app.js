@@ -379,7 +379,7 @@ async function loadForUser(user) {
   }
 }
 
-function resetSignedOutState(message = "공유 선불 잔액을 불러오려면 Google 계정으로 로그인하세요.") {
+function resetSignedOutState(message = "선결제 잔액을 불러오려면 Google 계정으로 로그인하세요.") {
   teardownRealtime();
   state.authInitUserId = null;
   state.authInitPromise = null;
@@ -539,7 +539,7 @@ function updateCardFields() {
   const memo = els.unregisteredMemo.value.trim();
   els.registeredCardPreview.innerHTML = memo
     ? `<strong>${escapeHtml(memo)}</strong> 등록되지 않은 카드`
-    : "등록되지 않은 카드는 이 선불 기록에만 저장됩니다.";
+    : "등록되지 않은 카드는 이 항목에만 저장됩니다.";
 }
 
 async function addPrepayment() {
