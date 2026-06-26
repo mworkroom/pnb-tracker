@@ -28,8 +28,7 @@ const UNREGISTERED_VALUE = "__unregistered__";
 const DEFAULT_UNREGISTERED_COLOR = "#8a8a8a";
 const SLOW_REQUEST_MS = 4000;
 const AUTH_TIMEOUT_MS = 45000;
-const AUTH_RESTORE_ATTEMPTS = 10;
-const AUTH_RESTORE_RETRY_MS = 500;
+const AUTH_STORAGE_KEY = "paynowbiz-auth";
 
 const state = {
   user: null,
@@ -51,6 +50,8 @@ const state = {
   saving: false,
   realtimeUnsubscribe: null,
   realtimeRefreshTimer: null,
+  authInitUserId: null,
+  authInitPromise: null,
 };
 
 const moneyFormat = new Intl.NumberFormat("ko-KR");
@@ -112,7 +113,9 @@ async function init() {
     return;
   }
 
-  onAuthStateChange(async (event, session) => {
+  onAuthStateChange((event, session) => {
+    logAuthDiagnostic("auth event", { event, session });
+
     if (event === "SIGNED_OUT") {
       resetSignedOutState();
       return;
@@ -120,9 +123,7 @@ async function init() {
 
     if (!session?.user) return;
 
-    if (state.user?.id !== session.user.id) {
-      await loadForUser(session.user);
-    }
+    scheduleAuthenticatedUserInit(session.user, event);
   });
 
   await restoreSession();
@@ -211,16 +212,17 @@ async function restoreSession() {
   }, SLOW_REQUEST_MS);
 
   try {
-    const { user } = await withTimeout(
-      getRestoredSession(),
+    const { session, user } = await withTimeout(
+      getCurrentSession(),
       AUTH_TIMEOUT_MS,
       "로그인 상태 확인 시간이 초과되었습니다. 새로고침 후 다시 시도해주세요.",
     );
+    logAuthDiagnostic("auth bootstrap", { event: "restoreSession", session, user });
     if (!user) {
       resetSignedOutState(getMissingStoredSessionMessage());
       return;
     }
-    await loadForUser(user);
+    await initAuthenticatedUser(user, "restoreSession");
   } catch (error) {
     renderSignedOut(getErrorMessage(error), true);
   } finally {
@@ -230,7 +232,7 @@ async function restoreSession() {
 
 function getMissingStoredSessionMessage() {
   try {
-    const hasAnySupabaseAuthKey = Object.keys(window.localStorage).some((key) => key.includes("auth-token") || key.includes("paynowbiz-auth"));
+    const hasAnySupabaseAuthKey = hasStoredAuthKey();
     if (!hasAnySupabaseAuthKey) {
       return "저장된 로그인 정보가 없습니다. Google로 다시 로그인해주세요.";
     }
@@ -241,20 +243,106 @@ function getMissingStoredSessionMessage() {
   return "로그인 세션을 복원하지 못했습니다. Google로 다시 로그인해주세요.";
 }
 
-async function getRestoredSession() {
-  let lastResult = { session: null, user: null };
+function hasStoredAuthKey() {
+  return Object.keys(window.localStorage).some((key) => key === AUTH_STORAGE_KEY || key.includes("auth-token") || key.includes(AUTH_STORAGE_KEY));
+}
 
-  for (let attempt = 0; attempt < AUTH_RESTORE_ATTEMPTS; attempt += 1) {
-    lastResult = await getCurrentSession();
-    if (lastResult.user) return lastResult;
-    await delay(AUTH_RESTORE_RETRY_MS);
+function logAuthDiagnostic(label, context = {}) {
+  const session = context.session ?? null;
+  const user = context.user ?? session?.user ?? null;
+  const details = {
+    event: context.event ?? null,
+    hasSession: Boolean(session),
+    userId: user?.id ?? state.user?.id ?? null,
+    storedAuthKeyExists: false,
+  };
+
+  try {
+    details.storedAuthKeyExists = hasStoredAuthKey();
+  } catch (error) {
+    details.storageReadError = getErrorMessage(error);
   }
 
-  return lastResult;
+  if ("membership" in context) {
+    details.membershipFound = Boolean(context.membership);
+    details.membershipRole = context.membership?.role ?? null;
+  }
+
+  if (context.error) {
+    details.error = getErrorMessage(context.error);
+  }
+
+  console.debug(`[PayNowBiz auth] ${label}`, details);
+}
+
+function clearOAuthCallbackFromUrl() {
+  const url = new URL(window.location.href);
+  let changed = false;
+
+  ["code", "state", "error", "error_code", "error_description"].forEach((key) => {
+    if (url.searchParams.has(key)) {
+      url.searchParams.delete(key);
+      changed = true;
+    }
+  });
+
+  if (url.hash) {
+    const hash = url.hash.slice(1);
+    const authHashKeys = [
+      "access_token",
+      "expires_at",
+      "expires_in",
+      "provider_refresh_token",
+      "provider_token",
+      "refresh_token",
+      "token_type",
+      "type",
+    ];
+    const hasAuthHash = authHashKeys.some((key) => hash.includes(`${key}=`));
+    if (hasAuthHash) {
+      url.hash = "";
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    window.history.replaceState({}, document.title, url.toString());
+  }
+}
+
+function scheduleAuthenticatedUserInit(user, source) {
+  window.setTimeout(() => {
+    void initAuthenticatedUser(user, source);
+  }, 0);
+}
+
+function initAuthenticatedUser(user, source) {
+  if (!user?.id) return Promise.resolve();
+
+  if (state.user?.id === user.id && state.membership) {
+    logAuthDiagnostic("auth init skipped", { event: source, user });
+    clearOAuthCallbackFromUrl();
+    return Promise.resolve();
+  }
+
+  if (state.authInitPromise && state.authInitUserId === user.id) {
+    logAuthDiagnostic("auth init joined", { event: source, user });
+    return state.authInitPromise;
+  }
+
+  logAuthDiagnostic("auth init start", { event: source, user });
+  state.authInitUserId = user.id;
+  state.authInitPromise = loadForUser(user).finally(() => {
+    state.authInitUserId = null;
+    state.authInitPromise = null;
+  });
+
+  return state.authInitPromise;
 }
 
 async function loadForUser(user) {
   state.user = user;
+  clearOAuthCallbackFromUrl();
   renderSignedOut("워크스페이스 권한을 확인하는 중입니다.", false, { canLogout: true });
   const slowTimer = window.setTimeout(() => {
     renderSignedOut("워크스페이스 권한 확인이 조금 오래 걸리고 있습니다. Supabase 응답을 기다리는 중입니다.", false, {
@@ -263,11 +351,14 @@ async function loadForUser(user) {
   }, SLOW_REQUEST_MS);
 
   try {
+    logAuthDiagnostic("membership request start", { user });
     const membership = await withTimeout(
       getCurrentMembership(user),
       AUTH_TIMEOUT_MS,
       "워크스페이스 권한 확인 시간이 초과되었습니다. 새로고침 후 다시 로그인해주세요.",
     );
+    logAuthDiagnostic("membership request success", { user, membership });
+    if (state.user?.id !== user.id) return;
     if (!membership) {
       state.membership = null;
       state.data = createEmptyData();
@@ -280,6 +371,8 @@ async function loadForUser(user) {
     setupRealtime();
     await refreshWorkspaceData("불러옴", { silent: true });
   } catch (error) {
+    logAuthDiagnostic("membership request error", { user, error });
+    if (state.user?.id !== user.id) return;
     renderSignedOut(getErrorMessage(error), true);
   } finally {
     window.clearTimeout(slowTimer);
@@ -288,6 +381,8 @@ async function loadForUser(user) {
 
 function resetSignedOutState(message = "공유 선불 잔액을 불러오려면 Google 계정으로 로그인하세요.") {
   teardownRealtime();
+  state.authInitUserId = null;
+  state.authInitPromise = null;
   state.user = null;
   state.membership = null;
   state.data = createEmptyData();
@@ -1213,12 +1308,6 @@ function withTimeout(promise, timeoutMs, message) {
 
   return Promise.race([promise, timeout]).finally(() => {
     window.clearTimeout(timeoutId);
-  });
-}
-
-function delay(ms) {
-  return new Promise((resolve) => {
-    window.setTimeout(resolve, ms);
   });
 }
 
