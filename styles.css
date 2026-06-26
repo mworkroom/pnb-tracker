@@ -169,6 +169,12 @@ h2 {
   font-weight: 900;
 }
 
+.secondary-tools h2,
+.secondary-tools .completed-toggle strong {
+  font-size: 1rem;
+  font-weight: 950;
+}
+
 .save-status {
   min-width: 68px;
   min-height: 24px;
@@ -183,6 +189,21 @@ h2 {
 .new-panel,
 .search-panel {
   margin-bottom: 12px;
+}
+
+.secondary-tools {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+  border-top: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px 10px 10px;
+  background: #eeeeee;
+}
+
+.secondary-tools .completed-section,
+.secondary-tools .search-panel {
+  margin-bottom: 0;
 }
 
 .section-heading {
@@ -917,9 +938,13 @@ select {
 }
 
 input[type="date"] {
+  -webkit-appearance: none;
+  appearance: none;
+  box-sizing: border-box;
   width: 100%;
   max-width: 100%;
   min-width: 0;
+  min-inline-size: 0;
   height: 52px;
   min-height: 52px;
   padding: 0 12px;
@@ -930,6 +955,9 @@ input[type="date"] {
 }
 
 input[type="date"]::-webkit-date-and-time-value {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   min-height: auto;
   padding: 0;
   text-align: left;

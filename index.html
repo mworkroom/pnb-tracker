@@ -146,65 +146,67 @@
           </form>
         </section>
 
-        <section class="completed-section" aria-labelledby="completedTitle">
-          <button
-            id="completedToggle"
-            class="completed-toggle"
-            type="button"
-            aria-expanded="false"
-          >
-            <span>
-              <strong id="completedTitle">최근 사용 완료 내역</strong>
-              <small id="completedSummary">0건</small>
-            </span>
-            <span class="toggle-mark" aria-hidden="true">열기</span>
-          </button>
-          <div id="completedList" class="balance-list completed-list" hidden></div>
-        </section>
 
-        <section class="search-panel" aria-labelledby="searchTitle">
-          <div class="section-heading">
-            <div>
-              <h2 id="searchTitle">승인번호 검색</h2>
+        <div class="secondary-tools" aria-label="보조 기능">
+          <section class="search-panel" aria-labelledby="searchTitle">
+            <div class="section-heading">
+              <div>
+                <h2 id="searchTitle">승인번호로 검색</h2>
+              </div>
             </div>
-          </div>
-          <label class="search-label">
-            <span>승인번호로 검색</span>
-            <div class="search-row">
-              <input
-                id="approvalSearchInput"
-                type="search"
-                inputmode="numeric"
-                placeholder="승인번호로 검색"
-                autocomplete="off"
-              />
-              <button id="approvalSearchClear" class="secondary-button clear-search-button" type="button" hidden>지우기</button>
+            <label class="search-label">
+              <div class="search-row">
+                <input
+                  id="approvalSearchInput"
+                  type="search"
+                  inputmode="numeric"
+                  placeholder="번호를 입력해주세요"
+                  autocomplete="off"
+                />
+                <button id="approvalSearchClear" class="secondary-button clear-search-button" type="button" hidden>지우기</button>
+              </div>
+            </label>
+            <div id="searchSection" class="search-results" hidden>
+              <div class="section-subheading">
+                <strong>검색 결과</strong>
+                <small id="searchSummary"></small>
+              </div>
+              <div id="searchList" class="balance-list"></div>
             </div>
-          </label>
-          <div id="searchSection" class="search-results" hidden>
-            <div class="section-subheading">
-              <strong>검색 결과</strong>
-              <small id="searchSummary"></small>
-            </div>
-            <div id="searchList" class="balance-list"></div>
-          </div>
-        </section>
+          </section>
 
-        <section class="completed-section archive-section" aria-labelledby="archiveTitle">
-          <button
-            id="archiveToggle"
-            class="completed-toggle"
-            type="button"
-            aria-expanded="false"
-          >
-            <span>
-              <strong id="archiveTitle">이전 기록</strong>
-              <small id="archiveSummary"></small>
-            </span>
-            <span class="toggle-mark" aria-hidden="true">열기</span>
-          </button>
-          <div id="archiveYearList" class="archive-year-list-wrap" hidden></div>
-        </section>
+          <section class="completed-section" aria-labelledby="completedTitle">
+            <button
+              id="completedToggle"
+              class="completed-toggle"
+              type="button"
+              aria-expanded="false"
+            >
+              <span>
+                <strong id="completedTitle">최근 사용 완료 내역</strong>
+                <small id="completedSummary">0건</small>
+              </span>
+              <span class="toggle-mark" aria-hidden="true">열기</span>
+            </button>
+            <div id="completedList" class="balance-list completed-list" hidden></div>
+          </section>
+
+          <section class="completed-section archive-section" aria-labelledby="archiveTitle">
+            <button
+              id="archiveToggle"
+              class="completed-toggle"
+              type="button"
+              aria-expanded="false"
+            >
+              <span>
+                <strong id="archiveTitle">이전 기록</strong>
+                <small id="archiveSummary"></small>
+              </span>
+              <span class="toggle-mark" aria-hidden="true">열기</span>
+            </button>
+            <div id="archiveYearList" class="archive-year-list-wrap" hidden></div>
+          </section>
+        </div>
       </main>
     </div>
 
