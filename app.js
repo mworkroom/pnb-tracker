@@ -1,4 +1,5 @@
 import {
+  canUseAuthStorage,
   cancelPrepayment as cancelPrepaymentRecord,
   cancelTransaction,
   createCard,
@@ -199,6 +200,11 @@ function bindEvents() {
 }
 
 async function restoreSession() {
+  if (!canUseAuthStorage()) {
+    renderSignedOut("이 브라우저에서 로그인 저장소를 사용할 수 없습니다. 사이트 데이터/개인정보 보호 설정을 확인해주세요.", true);
+    return;
+  }
+
   renderSignedOut("로그인 상태를 확인하는 중입니다.", false);
   const slowTimer = window.setTimeout(() => {
     renderSignedOut("로그인 확인이 조금 오래 걸리고 있습니다. Supabase 응답을 기다리는 중입니다.", false);
@@ -211,7 +217,7 @@ async function restoreSession() {
       "로그인 상태 확인 시간이 초과되었습니다. 새로고침 후 다시 시도해주세요.",
     );
     if (!user) {
-      resetSignedOutState();
+      resetSignedOutState(getMissingStoredSessionMessage());
       return;
     }
     await loadForUser(user);
@@ -220,6 +226,19 @@ async function restoreSession() {
   } finally {
     window.clearTimeout(slowTimer);
   }
+}
+
+function getMissingStoredSessionMessage() {
+  try {
+    const hasAnySupabaseAuthKey = Object.keys(window.localStorage).some((key) => key.includes("auth-token") || key.includes("paynowbiz-auth"));
+    if (!hasAnySupabaseAuthKey) {
+      return "저장된 로그인 정보가 없습니다. Google로 다시 로그인해주세요.";
+    }
+  } catch {
+    return "로그인 정보를 읽을 수 없습니다. 사이트 데이터/개인정보 보호 설정을 확인해주세요.";
+  }
+
+  return "로그인 세션을 복원하지 못했습니다. Google로 다시 로그인해주세요.";
 }
 
 async function getRestoredSession() {
@@ -267,7 +286,7 @@ async function loadForUser(user) {
   }
 }
 
-function resetSignedOutState() {
+function resetSignedOutState(message = "공유 선불 잔액을 불러오려면 Google 계정으로 로그인하세요.") {
   teardownRealtime();
   state.user = null;
   state.membership = null;
@@ -284,7 +303,7 @@ function resetSignedOutState() {
   state.searchResults = createEmptyData();
   state.searchLoading = false;
   window.clearTimeout(state.searchTimer);
-  renderSignedOut("공유 선불 잔액을 불러오려면 Google 계정으로 로그인하세요.", true);
+  renderSignedOut(message, true);
 }
 
 function renderSignedOut(message, canLogin, options = {}) {

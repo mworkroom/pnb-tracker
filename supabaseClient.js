@@ -1,6 +1,8 @@
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "./supabase.config.js";
 
+export const SUPABASE_AUTH_STORAGE_KEY = "paynowbiz-auth";
+
 export const isSupabaseConfigured =
   SUPABASE_URL &&
   SUPABASE_PUBLISHABLE_KEY &&
@@ -12,7 +14,9 @@ export const supabase = isSupabaseConfigured
       auth: {
         autoRefreshToken: true,
         detectSessionInUrl: true,
+        flowType: "pkce",
         persistSession: true,
+        storageKey: SUPABASE_AUTH_STORAGE_KEY,
       },
     })
   : null;
@@ -29,3 +33,13 @@ export function getOAuthRedirectUrl() {
   return url.toString();
 }
 
+export function canUseAuthStorage() {
+  try {
+    const testKey = `${SUPABASE_AUTH_STORAGE_KEY}:test`;
+    window.localStorage.setItem(testKey, "1");
+    window.localStorage.removeItem(testKey);
+    return true;
+  } catch {
+    return false;
+  }
+}

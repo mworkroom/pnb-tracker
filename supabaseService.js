@@ -1,6 +1,6 @@
-import { getOAuthRedirectUrl, isSupabaseConfigured, supabase } from "./supabaseClient.js";
+import { canUseAuthStorage, getOAuthRedirectUrl, isSupabaseConfigured, supabase } from "./supabaseClient.js";
 
-export { isSupabaseConfigured };
+export { canUseAuthStorage, isSupabaseConfigured };
 
 const CARD_SELECT = "id, workspace_id, name, first4, last4, color, active, created_at, updated_at";
 const PREPAYMENT_SELECT =
@@ -21,6 +21,10 @@ export async function getCurrentSession() {
 }
 
 export async function signInWithGoogle() {
+  if (!canUseAuthStorage()) {
+    throw new Error("이 브라우저에서 로그인 저장소를 사용할 수 없습니다. 사이트 데이터/개인정보 보호 설정을 확인해주세요.");
+  }
+
   const client = requireSupabase();
   const { error } = await client.auth.signInWithOAuth({
     provider: "google",
