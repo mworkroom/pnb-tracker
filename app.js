@@ -6,7 +6,6 @@ import {
   createTransaction,
   getCurrentMembership,
   getCurrentSession,
-  importLegacyData,
   isSupabaseConfigured,
   loadArchiveYear,
   loadArchiveYears,
@@ -24,11 +23,12 @@ import {
   updateCard,
 } from "./supabaseService.js";
 
-const LEGACY_STORAGE_KEY = "paynowbiz-tracker:v1";
 const UNREGISTERED_VALUE = "__unregistered__";
 const DEFAULT_UNREGISTERED_COLOR = "#8a8a8a";
 const SLOW_REQUEST_MS = 4000;
 const AUTH_TIMEOUT_MS = 45000;
+const AUTH_RESTORE_ATTEMPTS = 10;
+const AUTH_RESTORE_RETRY_MS = 500;
 
 const state = {
   user: null,
@@ -113,10 +113,12 @@ async function init() {
   }
 
   onAuthStateChange(async (event, session) => {
-    if (event === "SIGNED_OUT" || !session?.user) {
+    if (event === "SIGNED_OUT") {
       resetSignedOutState();
       return;
     }
+
+    if (!session?.user) return;
 
     if (state.user?.id !== session.user.id) {
       await loadForUser(session.user);
@@ -205,7 +207,7 @@ async function restoreSession() {
 
   try {
     const { user } = await withTimeout(
-      getCurrentSession(),
+      getRestoredSession(),
       AUTH_TIMEOUT_MS,
       "로그인 상태 확인 시간이 초과되었습니다. 새로고침 후 다시 시도해주세요.",
     );
@@ -219,6 +221,18 @@ async function restoreSession() {
   } finally {
     window.clearTimeout(slowTimer);
   }
+}
+
+async function getRestoredSession() {
+  let lastResult = { session: null, user: null };
+
+  for (let attempt = 0; attempt < AUTH_RESTORE_ATTEMPTS; attempt += 1) {
+    lastResult = await getCurrentSession();
+    if (lastResult.user) return lastResult;
+    await delay(AUTH_RESTORE_RETRY_MS);
+  }
+
+  return lastResult;
 }
 
 async function loadForUser(user) {
@@ -958,7 +972,6 @@ function renderAdmin() {
   if (els.adminDialog.hidden || !isAdmin()) return;
 
   const cancelledPrepayments = state.adminCancelledPrepayments;
-  const legacy = readLegacyLocalStorage();
   els.adminContent.innerHTML = `
     <section class="admin-section">
       <h3>카드 관리</h3>
@@ -986,10 +999,6 @@ function renderAdmin() {
         <button class="secondary-button" type="button" data-backup="prepayments">Prepayments CSV 다운로드</button>
         <button class="secondary-button" type="button" data-backup="transactions">Transactions CSV 다운로드</button>
       </div>
-    </section>
-    <section class="admin-section">
-      <h3>기존 localStorage 가져오기</h3>
-      ${renderLegacyMigrationBox(legacy)}
     </section>
   `;
   applyBusyState();
@@ -1077,29 +1086,6 @@ function renderAdminCancelledPrepayment(prepayment) {
   `;
 }
 
-function renderLegacyMigrationBox(legacy) {
-  const disabled = state.saving ? "disabled" : "";
-  if (legacy.error) {
-    return `<div class="migration-box"><p class="metadata">${escapeHtml(legacy.error)}</p></div>`;
-  }
-
-  if (!legacy.exists) {
-    return `<div class="migration-box"><p class="metadata">기존 localStorage 데이터가 없습니다.</p></div>`;
-  }
-
-  return `
-    <div class="migration-box">
-      <p class="metadata">
-        카드 ${legacy.counts.cards}건 · 선결제 ${legacy.counts.prepayments}건 · 거래 ${legacy.counts.transactions}건을 찾았습니다.
-      </p>
-      <div class="migration-actions">
-        <button class="secondary-button" type="button" data-migration-action="import" ${disabled}>Supabase로 가져오기</button>
-        <button class="danger-small-button" type="button" data-migration-action="clear" ${disabled}>기존 localStorage 삭제</button>
-      </div>
-    </div>
-  `;
-}
-
 function handleAdminSubmit(event) {
   const createForm = event.target.closest("[data-card-create-form]");
   const editForm = event.target.closest("[data-card-edit-form]");
@@ -1144,15 +1130,6 @@ function handleAdminClick(event) {
     return;
   }
 
-  const migrationButton = event.target.closest("[data-migration-action]");
-  if (!migrationButton) return;
-
-  if (migrationButton.dataset.migrationAction === "import") {
-    void importLegacyLocalStorage();
-    return;
-  }
-
-  clearLegacyLocalStorage();
 }
 
 function getCardFormValues(form) {
@@ -1167,32 +1144,6 @@ function getCardFormValues(form) {
   if (!isFourDigits(last4)) throw new Error("뒤 4자리 확인");
 
   return { name, first4, last4, color };
-}
-
-async function importLegacyLocalStorage() {
-  const legacy = readLegacyLocalStorage();
-  if (!legacy.exists || legacy.error) {
-    showStatus(legacy.error || "가져올 데이터가 없습니다.");
-    return;
-  }
-
-  const ok = window.confirm(
-    "기존 localStorage 데이터를 현재 공유 워크스페이스로 가져올까요? 같은 카드, 승인번호, 승인일자, 금액의 선결제가 있으면 중단됩니다.",
-  );
-  if (!ok) return;
-
-  await runMutation(async () => {
-    const result = await importLegacyData(state.membership, legacy.data);
-    return `가져오기 완료: 카드 ${result.cards}건, 선결제 ${result.prepayments}건, 거래 ${result.transactions}건`;
-  }, "가져오기 완료");
-}
-
-function clearLegacyLocalStorage() {
-  const ok = window.confirm("기존 localStorage 데이터를 이 브라우저에서 삭제할까요? Supabase 데이터는 삭제되지 않습니다.");
-  if (!ok) return;
-  localStorage.removeItem(LEGACY_STORAGE_KEY);
-  renderAdmin();
-  showStatus("기존 데이터 삭제됨");
 }
 
 async function runMutation(action, successMessage) {
@@ -1242,6 +1193,12 @@ function withTimeout(promise, timeoutMs, message) {
   });
 }
 
+function delay(ms) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
 function setSaving(saving) {
   state.saving = saving;
   applyBusyState();
@@ -1257,30 +1214,6 @@ function applyBusyState() {
       control.id === "cancelDialogBack";
     control.disabled = state.saving && !staysEnabled;
   });
-}
-
-function readLegacyLocalStorage() {
-  try {
-    const raw = localStorage.getItem(LEGACY_STORAGE_KEY);
-    if (!raw) return { exists: false };
-
-    const data = JSON.parse(raw);
-    if (!Array.isArray(data.cards) || !Array.isArray(data.prepayments) || !Array.isArray(data.transactions)) {
-      return { exists: true, error: "기존 localStorage 데이터 형식이 맞지 않습니다." };
-    }
-
-    return {
-      exists: true,
-      data,
-      counts: {
-        cards: data.cards.length,
-        prepayments: data.prepayments.length,
-        transactions: data.transactions.length,
-      },
-    };
-  } catch {
-    return { exists: true, error: "기존 localStorage 데이터를 읽을 수 없습니다." };
-  }
 }
 
 async function downloadBackup(type) {

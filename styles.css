@@ -635,7 +635,6 @@ label span {
 .admin-form,
 .admin-card-item,
 .admin-record-item,
-.migration-box,
 .backup-grid {
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -665,8 +664,7 @@ label span {
 }
 
 .admin-actions,
-.backup-grid,
-.migration-actions {
+.backup-grid {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
