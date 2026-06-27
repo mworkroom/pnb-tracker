@@ -1638,8 +1638,14 @@ function getErrorMessage(error) {
   if (error?.code === "23505" || message.includes("duplicate key")) {
     return "이미 같은 카드, 승인번호, 승인일자, 금액의 선결제가 등록되어 있습니다.";
   }
+  if (
+    message.includes("member users can only soft-cancel prepayments") ||
+    message.includes("member users can only change transaction status")
+  ) {
+    return "Supabase SQL 업데이트가 필요합니다. supabase/migrations/005_repair_write_policies.sql을 실행해주세요.";
+  }
   if (message.includes("row-level security") || message.includes("permission denied")) {
-    return "권한이 없어 저장할 수 없습니다.";
+    return "권한이 없어 저장할 수 없습니다. 카드/사용내역 저장이면 005 SQL 업데이트가 필요할 수 있습니다.";
   }
   if (message) return message;
   return "요청을 처리하지 못했습니다.";
