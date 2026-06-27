@@ -206,15 +206,16 @@ h2 {
   display: grid;
   gap: 10px;
   margin-top: 18px;
-  border-top: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 14px 10px 10px;
-  background: #eeeeee;
 }
 
 .secondary-tools .completed-section,
 .secondary-tools .search-panel {
   margin-bottom: 0;
+  background: #d3d3d3;
+}
+
+.secondary-tools .completed-toggle {
+  background: #d3d3d3;
 }
 
 .section-heading {
@@ -459,6 +460,10 @@ label span {
   font-weight: 950;
 }
 
+.usage-total-detail {
+  margin-top: -4px;
+}
+
 .usage-form {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -545,10 +550,12 @@ label span {
   min-height: 44px;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius);
+  padding: 0 10px;
   background: var(--button-soft);
   color: var(--text);
   font-size: 0.9rem;
   font-weight: 900;
+  white-space: nowrap;
 }
 
 .transaction-action.cancel {
@@ -1107,10 +1114,27 @@ input[type="date"]::-webkit-datetime-edit {
   }
 
   .transaction-item {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px;
+    min-height: 46px;
+    padding: 7px;
+  }
+
+  .transaction-line {
+    flex-wrap: nowrap;
+    gap: 4px;
+    font-size: 0.86rem;
+    white-space: nowrap;
+  }
+
+  .transaction-line strong {
+    font-size: 0.92rem;
   }
 
   .transaction-action {
-    width: 100%;
+    min-width: 48px;
+    min-height: 34px;
+    padding: 0 8px;
+    font-size: 0.82rem;
   }
 }

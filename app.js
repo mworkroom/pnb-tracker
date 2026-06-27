@@ -964,20 +964,17 @@ function renderBalanceList(container, prepayments, emptyMessage = "사용 중인
     node.querySelector(".card-label").textContent = cardDigitsText(prepayment);
 
     if (isOpen) {
-      node.querySelector(".balance-detail").innerHTML = renderBalanceDetail(prepayment, used, remaining);
+      node.querySelector(".balance-detail").innerHTML = renderBalanceDetail(prepayment, used);
     }
 
     container.append(node);
   });
 }
 
-function renderBalanceDetail(prepayment, used, remaining) {
+function renderBalanceDetail(prepayment, used) {
   const transactions = state.data.transactions
     .filter((transaction) => transaction.prepaymentId === prepayment.id)
     .sort(sortTransactions);
-  const memoRow = prepayment.memo
-    ? `<div class="detail-row memo-detail"><span>메모</span><strong>${escapeHtml(prepayment.memo)}</strong></div>`
-    : "";
   const displayStatus = getPrepaymentStatus(prepayment);
   const canUse = displayStatus !== "cancelled";
   const disabled = state.saving ? "disabled" : "";
@@ -1008,17 +1005,8 @@ function renderBalanceDetail(prepayment, used, remaining) {
     : "";
 
   return `
-    <div class="detail-info">
-      <div class="detail-row"><span>카드번호</span><strong>${escapeHtml(maskCardNumber(prepayment.cardFirst4Snapshot, prepayment.cardLast4Snapshot))}</strong></div>
-      <div class="detail-row"><span>승인번호</span><strong>${escapeHtml(prepayment.approvalNumber)}</strong></div>
-      <div class="detail-row"><span>승인일</span><strong>${formatDate(prepayment.approvalDate)}</strong></div>
-      <div class="detail-row"><span>승인금액</span><strong>${formatMoney(prepayment.approvalAmount)}원</strong></div>
-      ${memoRow}
-      <div class="detail-row"><span>사용합계</span><strong>${formatMoney(used)}원</strong></div>
-      <div class="detail-row remaining-detail"><span>남은금액</span><strong>${escapeHtml(remainingText(remaining))}</strong></div>
-    </div>
     ${usageForm}
-    <h3 class="history-title">거래 내역</h3>
+    <div class="detail-row remaining-detail usage-total-detail"><span>누적 사용액</span><strong>${formatMoney(used)}원</strong></div>
     ${renderTransactions(transactions, displayStatus === "cancelled")}
     <div class="prepayment-actions">${registrationAction}</div>
   `;
@@ -1026,7 +1014,7 @@ function renderBalanceDetail(prepayment, used, remaining) {
 
 function renderTransactions(transactions, actionsLocked = false) {
   if (!transactions.length) {
-    return `<div class="empty-state">거래 내역이 없습니다.</div>`;
+    return `<div class="empty-state">사용 내역이 없습니다.</div>`;
   }
 
   const disabled = state.saving ? "disabled" : "";
