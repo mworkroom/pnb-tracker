@@ -29,6 +29,7 @@ const DEFAULT_UNREGISTERED_COLOR = "#8a8a8a";
 const SLOW_REQUEST_MS = 4000;
 const AUTH_TIMEOUT_MS = 45000;
 const AUTH_STORAGE_KEY = "paynowbiz-auth";
+const ADMIN_CANCELLED_PAGE_SIZE = 20;
 
 const state = {
   user: null,
@@ -36,6 +37,11 @@ const state = {
   data: createEmptyData(),
   adminCancelledPrepayments: [],
   adminCardStatus: "",
+  adminTab: "cards",
+  adminCreateOpen: false,
+  adminOpenCardId: null,
+  adminOpenCancelledId: null,
+  adminCancelledVisibleCount: ADMIN_CANCELLED_PAGE_SIZE,
   openPrepaymentId: null,
   completedOpen: false,
   archiveOpen: false,
@@ -65,6 +71,7 @@ const els = {
   setupMessage: document.querySelector("#setupMessage"),
   setupLogoutButton: document.querySelector("#setupLogoutButton"),
   appShell: document.querySelector("#appShell"),
+  mainView: document.querySelector("#mainView"),
   userInfo: document.querySelector("#userInfo"),
   logoutButton: document.querySelector("#logoutButton"),
   adminButton: document.querySelector("#adminButton"),
@@ -146,10 +153,7 @@ function bindEvents() {
   });
   els.adminButton.addEventListener("click", openAdminDialog);
   els.adminCloseButton.addEventListener("click", closeAdminDialog);
-  els.adminDialog.addEventListener("click", (event) => {
-    if (event.target === els.adminDialog) closeAdminDialog();
-  });
-  els.adminContent.addEventListener("click", handleAdminClick);
+  els.adminDialog.addEventListener("click", handleAdminClick);
   els.adminContent.addEventListener("submit", handleAdminSubmit);
 
   els.completedToggle.addEventListener("click", () => {
@@ -392,6 +396,11 @@ function resetSignedOutState(message = "선결제 잔액을 불러오려면 Goog
   state.data = createEmptyData();
   state.adminCancelledPrepayments = [];
   state.adminCardStatus = "";
+  state.adminTab = "cards";
+  state.adminCreateOpen = false;
+  state.adminOpenCardId = null;
+  state.adminOpenCancelledId = null;
+  state.adminCancelledVisibleCount = ADMIN_CANCELLED_PAGE_SIZE;
   state.openPrepaymentId = null;
   state.completedOpen = false;
   state.archiveOpen = false;
@@ -410,6 +419,7 @@ function renderSignedOut(message, canLogin, options = {}) {
   els.setupScreen.hidden = true;
   els.appShell.hidden = true;
   els.adminDialog.hidden = true;
+  els.mainView.hidden = false;
   els.authMessage.textContent = message;
   els.googleLoginButton.hidden = !canLogin;
   els.googleLoginButton.disabled = !canLogin;
@@ -423,6 +433,7 @@ function showSetupMessage() {
   els.setupScreen.hidden = false;
   els.appShell.hidden = true;
   els.adminDialog.hidden = true;
+  els.mainView.hidden = false;
   els.setupMessage.textContent = "이 계정은 아직 PayNowBiz Tracker에 등록되지 않았습니다.";
 }
 
@@ -430,6 +441,9 @@ function showAppShell() {
   els.authScreen.hidden = true;
   els.setupScreen.hidden = true;
   els.appShell.hidden = false;
+  if (els.adminDialog.hidden) {
+    els.mainView.hidden = false;
+  }
   els.userInfo.textContent = `${state.user?.email ?? ""} · ${state.membership?.role === "admin" ? "관리자" : "멤버"}`;
   els.adminButton.hidden = !isAdmin();
 }
@@ -748,6 +762,7 @@ async function restorePrepaymentRegistration(prepaymentId) {
   await runMutation(async () => {
     const prepayment = await restorePrepaymentRecord(state.membership, prepaymentId);
     state.openPrepaymentId = prepayment.id;
+    state.adminOpenCancelledId = null;
   }, "등록 복구됨");
 }
 
@@ -1055,13 +1070,17 @@ function renderTransactions(transactions, actionsLocked = false) {
 
 function openAdminDialog() {
   if (!isAdmin()) return;
+  els.mainView.hidden = true;
   els.adminDialog.hidden = false;
+  window.scrollTo(0, 0);
   renderAdmin();
   void refreshAdminCancelled({ renderAfter: true });
 }
 
 function closeAdminDialog() {
   els.adminDialog.hidden = true;
+  els.mainView.hidden = false;
+  window.scrollTo(0, 0);
 }
 
 async function refreshAdminCancelled(options = {}) {
@@ -1081,28 +1100,86 @@ async function refreshAdminCancelled(options = {}) {
 function renderAdmin() {
   if (els.adminDialog.hidden || !isAdmin()) return;
 
-  const cancelledPrepayments = state.adminCancelledPrepayments;
+  document.querySelectorAll("[data-admin-tab]").forEach((tab) => {
+    const isSelected = tab.dataset.adminTab === state.adminTab;
+    tab.classList.toggle("is-active", isSelected);
+    tab.setAttribute("aria-selected", String(isSelected));
+  });
+
+  if (state.adminTab === "cancelled") {
+    renderAdminCancelledTab();
+    return;
+  }
+
+  if (state.adminTab === "backup") {
+    renderAdminBackupTab();
+    return;
+  }
+
+  renderAdminCardsTab();
+  applyBusyState();
+}
+
+function renderAdminCardsTab() {
   els.adminContent.innerHTML = `
     <section class="admin-section">
-      <h3>카드 관리</h3>
-      ${renderCreateCardForm()}
+      <div class="admin-section-heading">
+        <h3>카드</h3>
+        <small>${state.data.cards.length}개</small>
+      </div>
+      <button
+        class="admin-row-button"
+        type="button"
+        data-admin-toggle-create-card
+        aria-expanded="${state.adminCreateOpen}"
+      >
+        <span>새 카드 등록</span>
+        <span class="toggle-mark" aria-hidden="true">${state.adminCreateOpen ? "닫기" : "열기"}</span>
+      </button>
+      ${state.adminCreateOpen ? renderCreateCardForm() : ""}
       <p class="metadata" data-admin-card-status aria-live="polite">${escapeHtml(state.adminCardStatus)}</p>
-      <div class="admin-card-list">
+      <div class="admin-compact-list">
         ${state.data.cards.length ? state.data.cards.map(renderAdminCard).join("") : `<div class="empty-state">등록된 카드가 없습니다.</div>`}
       </div>
     </section>
+  `;
+  applyBusyState();
+}
+
+function renderAdminCancelledTab() {
+  const cancelledPrepayments = state.adminCancelledPrepayments;
+  const visibleCount = Math.min(state.adminCancelledVisibleCount, cancelledPrepayments.length);
+  const visibleItems = cancelledPrepayments.slice(0, visibleCount);
+  els.adminContent.innerHTML = `
     <section class="admin-section">
-      <h3>취소된 선결제</h3>
-      <div class="admin-record-list">
+      <div class="admin-section-heading">
+        <h3>취소 내역</h3>
+        <small>${cancelledPrepayments.length}건</small>
+      </div>
+      <div class="admin-compact-list">
         ${
-          cancelledPrepayments.length
-            ? cancelledPrepayments.map(renderAdminCancelledPrepayment).join("")
+          visibleItems.length
+            ? visibleItems.map(renderAdminCancelledPrepayment).join("")
             : `<div class="empty-state">취소된 선결제가 없습니다.</div>`
         }
       </div>
+      ${
+        visibleCount < cancelledPrepayments.length
+          ? `<button class="secondary-button" type="button" data-admin-show-more-cancelled>더 보기</button>`
+          : ""
+      }
     </section>
+  `;
+  applyBusyState();
+}
+
+function renderAdminBackupTab() {
+  els.adminContent.innerHTML = `
     <section class="admin-section">
-      <h3>백업</h3>
+      <div class="admin-section-heading">
+        <h3>백업</h3>
+        <small>CSV / JSON</small>
+      </div>
       <div class="backup-grid">
         <button class="secondary-button" type="button" data-backup="json">Full JSON 다운로드</button>
         <button class="secondary-button" type="button" data-backup="cards">Cards CSV 다운로드</button>
@@ -1136,24 +1213,39 @@ function renderCreateCardForm() {
         <span>강조 색상</span>
         <input name="color" type="color" value="#6b7280" ${disabled} />
       </label>
-      <button class="secondary-button" type="submit" ${disabled}>카드 추가</button>
+      <button class="secondary-button" type="button" data-admin-create-card ${disabled}>카드 추가</button>
     </form>
   `;
 }
 
 function renderAdminCard(card) {
   const disabled = state.saving ? "disabled" : "";
+  const isOpen = state.adminOpenCardId === card.id;
   return `
-    <form class="admin-card-item" data-card-edit-form data-card-id="${escapeHtml(card.id)}" autocomplete="off" novalidate>
-      <div class="admin-card-title">
-        <span>${escapeHtml(card.name)} · ${escapeHtml(card.first4)}-${escapeHtml(card.last4)}</span>
-        <span class="status-pill ${card.active ? "active" : "inactive"}">${card.active ? "활성" : "비활성"}</span>
-      </div>
-      <label>
-        <span>카드 이름</span>
-        <input name="name" type="text" maxlength="40" value="${escapeHtml(card.name)}" required ${disabled} />
-      </label>
-      <div class="field-grid">
+    <article class="admin-list-item">
+      <button
+        class="admin-row-button"
+        type="button"
+        data-admin-card-toggle="${escapeHtml(card.id)}"
+        aria-expanded="${isOpen}"
+      >
+        <span>
+          <strong>${escapeHtml(card.name)}</strong>
+          <small>${escapeHtml(card.first4)}-${escapeHtml(card.last4)}</small>
+        </span>
+        <span class="admin-row-side">
+          <span class="status-pill ${card.active ? "active" : "inactive"}">${card.active ? "활성" : "비활성"}</span>
+          <span class="toggle-mark" aria-hidden="true">${isOpen ? "닫기" : "열기"}</span>
+        </span>
+      </button>
+      ${
+        isOpen
+          ? `<form class="admin-card-item" data-card-edit-form data-card-id="${escapeHtml(card.id)}" autocomplete="off" novalidate>
+        <label>
+          <span>카드 이름</span>
+          <input name="name" type="text" maxlength="40" value="${escapeHtml(card.name)}" required ${disabled} />
+        </label>
+        <div class="field-grid">
         <label>
           <span>앞 4자리</span>
           <input name="first4" type="text" inputmode="numeric" maxlength="4" pattern="[0-9]*" value="${escapeHtml(card.first4)}" required ${disabled} />
@@ -1162,36 +1254,59 @@ function renderAdminCard(card) {
           <span>뒤 4자리</span>
           <input name="last4" type="text" inputmode="numeric" maxlength="4" pattern="[0-9]*" value="${escapeHtml(card.last4)}" required ${disabled} />
         </label>
-      </div>
-      <label>
-        <span>강조 색상</span>
-        <input name="color" type="color" value="${escapeHtml(safeAccentColor(card.color))}" ${disabled} />
-      </label>
-      <p class="metadata">생성 ${formatDateTime(card.createdAt)} · 수정 ${formatDateTime(card.updatedAt)}</p>
-      <div class="admin-actions">
-        <button class="secondary-button" type="submit" ${disabled}>수정 저장</button>
-        <button class="secondary-button" type="button" data-card-active="${card.active ? "false" : "true"}" data-card-id="${escapeHtml(card.id)}" ${disabled}>
-          ${card.active ? "비활성화" : "재활성화"}
-        </button>
-      </div>
-    </form>
+        </div>
+        <label>
+          <span>강조 색상</span>
+          <input name="color" type="color" value="${escapeHtml(safeAccentColor(card.color))}" ${disabled} />
+        </label>
+        <p class="metadata">생성 ${formatDateTime(card.createdAt)} · 수정 ${formatDateTime(card.updatedAt)}</p>
+        <div class="admin-actions">
+          <button class="secondary-button" type="button" data-admin-update-card ${disabled}>수정 저장</button>
+          <button class="secondary-button" type="button" data-card-active="${card.active ? "false" : "true"}" data-card-id="${escapeHtml(card.id)}" ${disabled}>
+            ${card.active ? "비활성화" : "재활성화"}
+          </button>
+        </div>
+      </form>`
+          : ""
+      }
+    </article>
   `;
 }
 
 function renderAdminCancelledPrepayment(prepayment) {
   const disabled = state.saving ? "disabled" : "";
+  const isOpen = state.adminOpenCancelledId === prepayment.id;
   return `
-    <article class="admin-record-item">
-      <div class="admin-record-title">
-        <span>${renderCardNameBadge(prepayment)} 승인번호 ${escapeHtml(prepayment.approvalNumber)}</span>
-        <span class="status-pill inactive">취소</span>
-      </div>
-      <p class="metadata">
-        승인일 ${formatDate(prepayment.approvalDate)} · 승인금액 ${formatMoney(prepayment.approvalAmount)}원 · 최근활동 ${formatDateTime(prepayment.lastActivityAt)} · 생성 ${formatDateTime(prepayment.createdAt)} · 수정 ${formatDateTime(prepayment.updatedAt)}
-      </p>
-      <div class="admin-actions">
-        <button class="secondary-button" type="button" data-admin-restore-prepayment="${escapeHtml(prepayment.id)}" ${disabled}>복구</button>
-      </div>
+    <article class="admin-list-item">
+      <button
+        class="admin-row-button"
+        type="button"
+        data-admin-cancelled-toggle="${escapeHtml(prepayment.id)}"
+        aria-expanded="${isOpen}"
+      >
+        <span>
+          <strong>${formatDate(prepayment.approvalDate)} · ${escapeHtml(cardSummaryName(prepayment))}</strong>
+          <small>${formatMoney(prepayment.approvalAmount)}원 · 승인 ${escapeHtml(prepayment.approvalNumber)}</small>
+        </span>
+        <span class="admin-row-side">
+          <span class="status-pill inactive">취소</span>
+          <span class="toggle-mark" aria-hidden="true">${isOpen ? "닫기" : "열기"}</span>
+        </span>
+      </button>
+      ${
+        isOpen
+          ? `<div class="admin-record-item">
+        <p class="metadata">
+          카드 ${renderCardNameBadge(prepayment)} ${escapeHtml(cardDigitsText(prepayment))}<br />
+          승인일 ${formatDate(prepayment.approvalDate)} · 승인금액 ${formatMoney(prepayment.approvalAmount)}원<br />
+          최근활동 ${formatDateTime(prepayment.lastActivityAt)} · 생성 ${formatDateTime(prepayment.createdAt)} · 수정 ${formatDateTime(prepayment.updatedAt)}
+        </p>
+        <div class="admin-actions">
+          <button class="secondary-button" type="button" data-admin-restore-prepayment="${escapeHtml(prepayment.id)}" ${disabled}>복구</button>
+        </div>
+      </div>`
+          : ""
+      }
     </article>
   `;
 }
@@ -1203,14 +1318,26 @@ function handleAdminSubmit(event) {
   event.preventDefault();
 
   if (createForm) {
-    void runMutation(async () => {
-      showAdminCardStatus("카드 저장을 요청했습니다. Supabase 응답을 기다리는 중입니다...");
-      await createCard(state.membership, getCardFormValues(createForm));
-      createForm.reset();
-    }, "카드 추가됨");
+    saveNewCard(createForm);
     return;
   }
 
+  saveExistingCard(editForm);
+}
+
+function saveNewCard(createForm) {
+  if (!createForm) return;
+  void runMutation(async () => {
+    showAdminCardStatus("카드 저장을 요청했습니다. Supabase 응답을 기다리는 중입니다...");
+    const card = await createCard(state.membership, getCardFormValues(createForm));
+    state.adminCreateOpen = false;
+    state.adminOpenCardId = card.id;
+    createForm.reset();
+  }, "카드 추가됨");
+}
+
+function saveExistingCard(editForm) {
+  if (!editForm) return;
   void runMutation(async () => {
     showAdminCardStatus("카드 수정을 요청했습니다. Supabase 응답을 기다리는 중입니다...");
     await updateCard(state.membership, editForm.dataset.cardId, getCardFormValues(editForm));
@@ -1218,6 +1345,55 @@ function handleAdminSubmit(event) {
 }
 
 function handleAdminClick(event) {
+  const tabButton = event.target.closest("[data-admin-tab]");
+  if (tabButton) {
+    state.adminTab = tabButton.dataset.adminTab;
+    renderAdmin();
+    return;
+  }
+
+  const createToggle = event.target.closest("[data-admin-toggle-create-card]");
+  if (createToggle) {
+    state.adminCreateOpen = !state.adminCreateOpen;
+    renderAdmin();
+    return;
+  }
+
+  const cardToggle = event.target.closest("[data-admin-card-toggle]");
+  if (cardToggle) {
+    const cardId = cardToggle.dataset.adminCardToggle;
+    state.adminOpenCardId = state.adminOpenCardId === cardId ? null : cardId;
+    renderAdmin();
+    return;
+  }
+
+  const cancelledToggle = event.target.closest("[data-admin-cancelled-toggle]");
+  if (cancelledToggle) {
+    const prepaymentId = cancelledToggle.dataset.adminCancelledToggle;
+    state.adminOpenCancelledId = state.adminOpenCancelledId === prepaymentId ? null : prepaymentId;
+    renderAdmin();
+    return;
+  }
+
+  const showMoreCancelled = event.target.closest("[data-admin-show-more-cancelled]");
+  if (showMoreCancelled) {
+    state.adminCancelledVisibleCount += ADMIN_CANCELLED_PAGE_SIZE;
+    renderAdmin();
+    return;
+  }
+
+  const createCardButton = event.target.closest("[data-admin-create-card]");
+  if (createCardButton) {
+    saveNewCard(createCardButton.closest("[data-card-create-form]"));
+    return;
+  }
+
+  const updateCardButton = event.target.closest("[data-admin-update-card]");
+  if (updateCardButton) {
+    saveExistingCard(updateCardButton.closest("[data-card-edit-form]"));
+    return;
+  }
+
   const activeButton = event.target.closest("[data-card-active]");
   if (activeButton) {
     const active = activeButton.dataset.cardActive === "true";

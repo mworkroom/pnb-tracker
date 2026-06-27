@@ -655,35 +655,58 @@ label span {
   margin-top: 16px;
 }
 
-.admin-backdrop {
-  align-items: start;
-  overflow: auto;
-}
-
-.admin-panel {
+.admin-screen {
   display: grid;
   gap: 14px;
-  width: min(100%, 680px);
-  max-height: calc(100vh - 36px);
-  overflow: auto;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 16px;
-  background: var(--panel);
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.18);
+  padding-bottom: calc(20px + env(safe-area-inset-bottom));
 }
 
-.admin-header {
+.admin-screen-header {
   display: flex;
-  justify-content: space-between;
+  align-items: start;
   gap: 12px;
 }
 
-.admin-header p {
+.admin-screen-header h2 {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 950;
+}
+
+.admin-screen-header p {
   margin: 5px 0 0;
   color: var(--muted);
   font-size: 0.86rem;
   font-weight: 800;
+}
+
+.admin-back-button {
+  flex: 0 0 auto;
+}
+
+.admin-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 4px;
+  background: var(--panel);
+}
+
+.admin-tab {
+  min-height: 44px;
+  border: 0;
+  border-radius: calc(var(--radius) - 2px);
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 950;
+}
+
+.admin-tab.is-active {
+  background: var(--button);
+  color: #ffffff;
 }
 
 .admin-content {
@@ -694,27 +717,37 @@ label span {
 .admin-section {
   display: grid;
   gap: 10px;
-  border-top: 1px solid var(--line);
-  padding-top: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px;
+  background: var(--panel);
 }
 
-.admin-section:first-child {
-  border-top: 0;
-  padding-top: 0;
+.admin-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
-.admin-section h3 {
+.admin-section-heading h3 {
   margin: 0;
   color: var(--text);
   font-size: 1rem;
   font-weight: 950;
 }
 
+.admin-section-heading small {
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 850;
+}
+
 .admin-form,
 .admin-card-item,
 .admin-record-item,
 .backup-grid {
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: var(--radius);
   padding: 12px;
   background: var(--panel-soft);
@@ -726,19 +759,54 @@ label span {
   gap: 10px;
 }
 
-.admin-card-list,
-.admin-record-list {
+.admin-compact-list {
   display: grid;
   gap: 8px;
 }
 
-.admin-card-title,
-.admin-record-title {
+.admin-list-item {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel-soft);
+}
+
+.admin-row-button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 12px;
+  width: 100%;
+  min-height: 58px;
+  border: 0;
+  padding: 10px 12px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+}
+
+.admin-row-button strong,
+.admin-row-button small {
+  display: block;
+}
+
+.admin-row-button strong {
+  font-size: 0.98rem;
   font-weight: 950;
+}
+
+.admin-row-button small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.admin-row-side {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
 }
 
 .admin-actions,
