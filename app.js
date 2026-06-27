@@ -38,7 +38,6 @@ const state = {
   adminCancelledPrepayments: [],
   adminCardStatus: "",
   adminTab: "cards",
-  adminCreateOpen: false,
   adminOpenCardId: null,
   adminOpenCancelledId: null,
   adminCancelledVisibleCount: ADMIN_CANCELLED_PAGE_SIZE,
@@ -397,7 +396,6 @@ function resetSignedOutState(message = "선결제 잔액을 불러오려면 Goog
   state.adminCancelledPrepayments = [];
   state.adminCardStatus = "";
   state.adminTab = "cards";
-  state.adminCreateOpen = false;
   state.adminOpenCardId = null;
   state.adminOpenCancelledId = null;
   state.adminCancelledVisibleCount = ADMIN_CANCELLED_PAGE_SIZE;
@@ -557,7 +555,7 @@ function updateCardFields() {
   const memo = els.unregisteredMemo.value.trim();
   els.registeredCardPreview.innerHTML = memo
     ? `<strong>${escapeHtml(memo)}</strong> 미등록 카드`
-    : "등록되지 않은 카드는 이 항목에만 저장됩니다";
+    : "카드 번호는 이 항목에만 기록됩니다";
 }
 
 async function addPrepayment() {
@@ -1123,20 +1121,11 @@ function renderAdmin() {
 function renderAdminCardsTab() {
   els.adminContent.innerHTML = `
     <section class="admin-section">
+      ${renderCreateCardForm()}
       <div class="admin-section-heading">
-        <h3>카드</h3>
+        <h3>등록된 카드</h3>
         <small>${state.data.cards.length}개</small>
       </div>
-      <button
-        class="admin-row-button"
-        type="button"
-        data-admin-toggle-create-card
-        aria-expanded="${state.adminCreateOpen}"
-      >
-        <span>새 카드 등록</span>
-        <span class="toggle-mark" aria-hidden="true">${state.adminCreateOpen ? "닫기" : "열기"}</span>
-      </button>
-      ${state.adminCreateOpen ? renderCreateCardForm() : ""}
       <p class="metadata" data-admin-card-status aria-live="polite">${escapeHtml(state.adminCardStatus)}</p>
       <div class="admin-compact-list">
         ${state.data.cards.length ? state.data.cards.map(renderAdminCard).join("") : `<div class="empty-state">등록된 카드가 없습니다.</div>`}
@@ -1235,7 +1224,6 @@ function renderAdminCard(card) {
         </span>
         <span class="admin-row-side">
           <span class="status-pill ${card.active ? "active" : "inactive"}">${card.active ? "활성" : "비활성"}</span>
-          <span class="toggle-mark" aria-hidden="true">${isOpen ? "닫기" : "열기"}</span>
         </span>
       </button>
       ${
@@ -1290,7 +1278,6 @@ function renderAdminCancelledPrepayment(prepayment) {
         </span>
         <span class="admin-row-side">
           <span class="status-pill inactive">취소</span>
-          <span class="toggle-mark" aria-hidden="true">${isOpen ? "닫기" : "열기"}</span>
         </span>
       </button>
       ${
@@ -1341,7 +1328,6 @@ function saveNewCard(createForm) {
   void runMutation(async () => {
     showAdminCardStatus("카드 저장을 요청했습니다. Supabase 응답을 기다리는 중입니다...");
     const card = await createCard(state.membership, values);
-    state.adminCreateOpen = false;
     state.adminOpenCardId = card.id;
     createForm.reset();
   }, "카드 추가됨");
@@ -1371,13 +1357,6 @@ function handleAdminClick(event) {
   const tabButton = event.target.closest("[data-admin-tab]");
   if (tabButton) {
     state.adminTab = tabButton.dataset.adminTab;
-    renderAdmin();
-    return;
-  }
-
-  const createToggle = event.target.closest("[data-admin-toggle-create-card]");
-  if (createToggle) {
-    state.adminCreateOpen = !state.adminCreateOpen;
     renderAdmin();
     return;
   }
