@@ -598,8 +598,7 @@ label span {
   min-height: 40px;
   border-radius: var(--radius);
   padding: 0 12px;
-  font-size: 0.86rem;
-  font-weight: 900;
+  font-weight: 950;
 }
 
 .prepayment-cancel-button {
