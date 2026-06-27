@@ -373,7 +373,7 @@ async function loadForUser(user) {
     state.membership = membership;
     showAppShell();
     setupRealtime();
-    await refreshWorkspaceData("불러옴", { silent: true });
+    await refreshWorkspaceData("Loading", { silent: true });
   } catch (error) {
     logAuthDiagnostic("membership request error", { user, error });
     if (state.user?.id !== user.id) return;
