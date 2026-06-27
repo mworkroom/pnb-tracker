@@ -1327,9 +1327,20 @@ function handleAdminSubmit(event) {
 
 function saveNewCard(createForm) {
   if (!createForm) return;
+
+  let values;
+  try {
+    values = getCardFormValues(createForm);
+  } catch (error) {
+    const message = getErrorMessage(error);
+    showStatus(message);
+    showAdminCardStatus(message);
+    return;
+  }
+
   void runMutation(async () => {
     showAdminCardStatus("카드 저장을 요청했습니다. Supabase 응답을 기다리는 중입니다...");
-    const card = await createCard(state.membership, getCardFormValues(createForm));
+    const card = await createCard(state.membership, values);
     state.adminCreateOpen = false;
     state.adminOpenCardId = card.id;
     createForm.reset();
@@ -1338,9 +1349,21 @@ function saveNewCard(createForm) {
 
 function saveExistingCard(editForm) {
   if (!editForm) return;
+
+  let values;
+  try {
+    values = getCardFormValues(editForm);
+  } catch (error) {
+    const message = getErrorMessage(error);
+    showStatus(message);
+    showAdminCardStatus(message);
+    return;
+  }
+
+  const cardId = editForm.dataset.cardId;
   void runMutation(async () => {
     showAdminCardStatus("카드 수정을 요청했습니다. Supabase 응답을 기다리는 중입니다...");
-    await updateCard(state.membership, editForm.dataset.cardId, getCardFormValues(editForm));
+    await updateCard(state.membership, cardId, values);
   }, "카드 수정됨");
 }
 
