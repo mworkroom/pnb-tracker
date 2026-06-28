@@ -1,17 +1,20 @@
 :root {
-  --page: #f5f5f5;
+  --page: #f0f0f0;
   --panel: #ffffff;
-  --panel-soft: #fafafa;
-  --line: #dddddd;
-  --line-strong: #c8c8c8;
-  --text: #2f2f2f;
-  --muted: #707070;
-  --button: #3d3d3d;
+  --panel-soft: #f7f7f7;
+  --panel-recessed: #ebebeb;
+  --line: #e0e0e0;
+  --line-strong: #c4c4c4;
+  --text: #1e1e1e;
+  --muted: #6a6a6a;
+  --button: #222222;
   --button-soft: #eeeeee;
   --danger: #9f3434;
   --success: #256f45;
-  --shadow: 0 8px 24px rgba(0, 0, 0, 0.05);
-  --radius: 8px;
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.07), 0 0 0 1px rgba(0,0,0,0.04);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --radius: 10px;
+  --radius-sm: 7px;
 }
 
 *,
@@ -82,7 +85,9 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 2px 2px 16px;
+  padding: 4px 2px 18px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 20px;
 }
 
 .auth-screen {
@@ -95,11 +100,11 @@ button {
 
 .auth-panel {
   display: grid;
-  gap: 14px;
+  gap: 16px;
   width: min(100%, 360px);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 20px;
+  border-radius: calc(var(--radius) + 2px);
+  padding: 28px 24px;
   background: var(--panel);
   box-shadow: var(--shadow);
 }
@@ -145,13 +150,13 @@ button {
 }
 
 .small-icon-button {
-  min-height: 34px;
+  min-height: 36px;
   border: 1px solid var(--line-strong);
-  border-radius: var(--radius);
-  padding: 0 9px;
+  border-radius: var(--radius-sm);
+  padding: 0 11px;
   background: var(--panel);
   color: var(--text);
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   font-weight: 900;
 }
 
@@ -169,9 +174,11 @@ h2 {
 }
 
 h1 {
-  font-size: 1.5rem;
-  font-weight: 900;
-  padding-left: 5px;
+  font-size: 1.22rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  padding-left: 2px;
 }
 
 h2 {
@@ -204,14 +211,14 @@ h2 {
 .new-panel,
 .secondary-tools {
   position: relative;
-  margin-top: 34px;
+  margin-top: 28px;
 }
 
 .new-panel::before,
 .secondary-tools::before {
   content: "";
   position: absolute;
-  top: -18px;
+  top: -16px;
   right: 2px;
   left: 2px;
   border-top: 1px solid var(--line);
@@ -225,11 +232,11 @@ h2 {
 .secondary-tools .completed-section,
 .secondary-tools .search-panel {
   margin-bottom: 0;
-  background: #d3d3d3;
+  background: var(--panel);
 }
 
 .secondary-tools .completed-toggle {
-  background: #d3d3d3;
+  background: var(--panel);
 }
 
 .section-heading {
@@ -260,10 +267,11 @@ h2 {
   border-radius: var(--radius);
   background: var(--panel);
   box-shadow: var(--shadow);
+  overflow: hidden;
 }
 
 .balance-card {
-  overflow: hidden;
+  /* overflow already set above */
 }
 
 .balance-card.is-open {
@@ -347,13 +355,14 @@ select:focus-visible {
 .remaining-text {
   display: block;
   min-width: 0;
-  border-radius: var(--radius);
-  padding: 10px;
-  background: #eeeeee;
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  background: var(--panel-recessed);
   overflow-wrap: anywhere;
   color: var(--text);
-  font-size: 1.18rem;
+  font-size: 1.25rem;
   font-weight: 950;
+  letter-spacing: -0.02em;
 }
 
 .status-badge {
@@ -422,7 +431,7 @@ label span {
   display: none;
   border-top: 1px solid var(--line);
   padding: 12px;
-  background: var(--panel-soft);
+  background: var(--panel-recessed);
 }
 
 .balance-card.is-open .balance-detail {
@@ -465,9 +474,10 @@ label span {
 
 .remaining-detail {
   align-items: center;
-  border-radius: var(--radius);
+  border-radius: var(--radius-sm);
   padding: 12px;
-  background: #eeeeee;
+  background: var(--panel);
+  border: 1px solid var(--line);
   color: var(--text);
   font-size: 0.98rem;
   font-weight: 900;
@@ -910,7 +920,7 @@ label span {
 .completed-list {
   border-top: 1px solid var(--line);
   padding: 10px;
-  background: var(--panel-soft);
+  background: var(--panel-recessed);
 }
 
 .new-panel {
@@ -964,7 +974,7 @@ label span {
   gap: 8px;
   border-top: 1px solid var(--line);
   padding: 10px;
-  background: var(--panel-soft);
+  background: var(--panel-recessed);
 }
 
 .archive-year-section {
@@ -1031,7 +1041,7 @@ input {
   border: 1px solid var(--line-strong);
   border-radius: var(--radius);
   padding: 0 12px;
-  background: ##d3d3d3 var(--panel);
+  background: var(--panel-recessed);
   color: var(--text);
   font-size: 16px;
   line-height: 1.2;
@@ -1151,18 +1161,29 @@ input[type="date"]::-webkit-datetime-edit {
   min-height: 52px;
   border-radius: var(--radius);
   font-weight: 950;
+  font-size: 1rem;
+  transition: opacity 0.12s;
 }
 
 .primary-button {
   border: 0;
   background: var(--button);
   color: #ffffff;
+  letter-spacing: 0.01em;
+}
+
+.primary-button:active {
+  opacity: 0.8;
 }
 
 .secondary-button {
   border: 1px solid var(--line-strong);
   background: var(--button-soft);
   color: var(--text);
+}
+
+.secondary-button:active {
+  opacity: 0.7;
 }
 
 @media (min-width: 620px) {
