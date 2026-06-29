@@ -52,6 +52,7 @@ const state = {
   searchLoading: false,
   searchTimer: null,
   pendingCancelPrepaymentId: null,
+  cancelledTransactionVisibleIds: new Set(),
   saving: false,
   realtimeUnsubscribe: null,
   realtimeRefreshTimer: null,
@@ -520,8 +521,32 @@ function render() {
   applyBusyState();
 }
 
+function getCardSortGroup(card) {
+  const name = card.name.trim();
+
+  if (name === "하나카드") return 0;
+  if (name === "라온카드") return 1;
+  if (name.startsWith("지영")) return 2;
+
+  return 3;
+}
+
+function sortCards(a, b) {
+  const groupDifference = getCardSortGroup(a) - getCardSortGroup(b);
+
+  if (groupDifference !== 0) {
+    return groupDifference;
+  }
+
+  return a.name.trim().localeCompare(b.name.trim(), "ko");
+}
+
+function getSortedCards(cards = state.data.cards) {
+  return [...cards].sort(sortCards);
+}
+
 function renderCardOptions() {
-  const activeCards = state.data.cards.filter((card) => card.active);
+  const activeCards = getSortedCards(state.data.cards.filter((card) => card.active));
   const currentValue = els.cardSelect.value;
   els.cardSelect.innerHTML = [
     ...activeCards.map((card) => `<option value="${escapeHtml(card.id)}">${escapeHtml(card.name)}</option>`),
@@ -652,6 +677,18 @@ function handleBalanceListClick(event) {
       openCancelDialog(id);
       return;
     }
+  }
+
+  const cancelledToggle = event.target.closest("[data-cancelled-transactions-toggle]");
+  if (cancelledToggle) {
+    const prepaymentId = cancelledToggle.dataset.cancelledTransactionsToggle;
+    if (state.cancelledTransactionVisibleIds.has(prepaymentId)) {
+      state.cancelledTransactionVisibleIds.delete(prepaymentId);
+    } else {
+      state.cancelledTransactionVisibleIds.add(prepaymentId);
+    }
+    render();
+    return;
   }
 
   const action = event.target.closest("[data-transaction-action]");
@@ -985,9 +1022,14 @@ function renderBalanceList(container, prepayments, emptyMessage = "사용 중인
 }
 
 function renderBalanceDetail(prepayment, used) {
-  const transactions = state.data.transactions
+  const allTransactions = state.data.transactions
     .filter((transaction) => transaction.prepaymentId === prepayment.id)
     .sort(sortTransactions);
+  const cancelledCount = allTransactions.filter((transaction) => transaction.status === "cancelled").length;
+  const showCancelled = state.cancelledTransactionVisibleIds.has(prepayment.id);
+  const transactions = showCancelled
+    ? allTransactions
+    : allTransactions.filter((transaction) => transaction.status !== "cancelled");
   const displayStatus = getPrepaymentStatus(prepayment);
   const canUse = displayStatus !== "cancelled";
   const disabled = state.saving ? "disabled" : "";
@@ -1016,10 +1058,21 @@ function renderBalanceDetail(prepayment, used) {
   const registrationAction = canUse
     ? `<button class="prepayment-cancel-button" type="button" data-prepayment-id="${escapeHtml(prepayment.id)}" data-prepayment-action="requestCancel" ${disabled}>이 선결제 등록 취소</button>`
     : "";
+  const cancelledToggle = cancelledCount
+    ? `
+      <button
+        class="secondary-button"
+        type="button"
+        data-cancelled-transactions-toggle="${escapeHtml(prepayment.id)}"
+        aria-pressed="${showCancelled}"
+      >${showCancelled ? "취소 내역 숨기기" : `취소 내역 보기 (${cancelledCount})`}</button>
+    `
+    : "";
 
   return `
     ${usageForm}
     <div class="detail-row remaining-detail usage-total-detail"><span>누적 사용액</span><strong>${formatMoney(used)}원</strong></div>
+    ${cancelledToggle}
     ${renderTransactions(transactions, displayStatus === "cancelled")}
     <div class="prepayment-actions">${registrationAction}</div>
   `;
@@ -1128,7 +1181,7 @@ function renderAdminCardsTab() {
       </div>
       <p class="metadata" data-admin-card-status aria-live="polite">${escapeHtml(state.adminCardStatus)}</p>
       <div class="admin-compact-list">
-        ${state.data.cards.length ? state.data.cards.map(renderAdminCard).join("") : `<div class="empty-state">등록된 카드가 없습니다.</div>`}
+        ${state.data.cards.length ? getSortedCards().map(renderAdminCard).join("") : `<div class="empty-state">등록된 카드가 없습니다.</div>`}
       </div>
     </section>
   `;
@@ -1687,8 +1740,9 @@ function resetPrepaymentForm() {
   els.unregisteredFirst4.value = "";
   els.unregisteredLast4.value = "";
   els.unregisteredMemo.value = "";
-  if (state.data.cards.some((card) => card.active)) {
-    els.cardSelect.value = state.data.cards.find((card) => card.active).id;
+  const firstActiveCard = getSortedCards(state.data.cards.filter((card) => card.active))[0];
+  if (firstActiveCard) {
+    els.cardSelect.value = firstActiveCard.id;
   } else {
     els.cardSelect.value = UNREGISTERED_VALUE;
   }
