@@ -27,7 +27,10 @@ import {
 const UNREGISTERED_VALUE = "__unregistered__";
 const DEFAULT_UNREGISTERED_COLOR = "#8a8a8a";
 const SLOW_REQUEST_MS = 4000;
-const AUTH_TIMEOUT_MS = 45000;
+const AUTH_TIMEOUT_MS = 20000;
+const INITIAL_AUTH_EVENT_TIMEOUT_MS = 10000;
+const AUTH_RETRY_DELAY_MS = 1200;
+const AUTH_AUTO_RELOAD_KEY = "paynowbiz-auth-auto-reload";
 const AUTH_STORAGE_KEY = "paynowbiz-auth";
 const ADMIN_CANCELLED_PAGE_SIZE = 20;
 
@@ -122,8 +125,18 @@ async function init() {
     return;
   }
 
+  let resolveInitialAuth;
+  const initialAuthPromise = new Promise((resolve) => {
+    resolveInitialAuth = resolve;
+  });
+
   onAuthStateChange((event, session) => {
     logAuthDiagnostic("auth event", { event, session });
+
+    if (event === "INITIAL_SESSION") {
+      resolveInitialAuth({ session, user: session?.user ?? null });
+      return;
+    }
 
     if (event === "SIGNED_OUT") {
       resetSignedOutState();
@@ -135,7 +148,7 @@ async function init() {
     scheduleAuthenticatedUserInit(session.user, event);
   });
 
-  await restoreSession();
+  await restoreSession(initialAuthPromise);
 }
 
 function bindEvents() {
@@ -208,7 +221,7 @@ function bindEvents() {
   });
 }
 
-async function restoreSession() {
+async function restoreSession(initialAuthPromise) {
   if (!canUseAuthStorage()) {
     renderSignedOut("이 브라우저에서 로그인 저장소를 사용할 수 없습니다. 사이트 데이터/개인정보 보호 설정을 확인해주세요.", true);
     return;
@@ -216,25 +229,83 @@ async function restoreSession() {
 
   renderSignedOut("로그인 상태를 확인하는 중입니다.", false);
   const slowTimer = window.setTimeout(() => {
-    renderSignedOut("로그인 확인이 조금 오래 걸리고 있습니다. Supabase 응답을 기다리는 중입니다.", false);
+    renderSignedOut("로그인 확인이 조금 오래 걸리고 있습니다. 자동으로 다시 확인하는 중입니다.", false);
   }, SLOW_REQUEST_MS);
 
   try {
-    const { session, user } = await withTimeout(
-      getCurrentSession(),
-      AUTH_TIMEOUT_MS,
-      "로그인 상태 확인 시간이 초과되었습니다. 새로고침 후 다시 시도해주세요.",
-    );
+    let authResult;
+
+    try {
+      authResult = await withTimeout(
+        initialAuthPromise,
+        INITIAL_AUTH_EVENT_TIMEOUT_MS,
+        "초기 로그인 확인 응답이 지연되었습니다.",
+      );
+    } catch (initialError) {
+      logAuthDiagnostic("initial auth event timeout", { error: initialError });
+      renderSignedOut("로그인 연결이 지연되어 한 번 더 확인하는 중입니다.", false);
+      await delay(AUTH_RETRY_DELAY_MS);
+      authResult = await withTimeout(
+        getCurrentSession(),
+        AUTH_TIMEOUT_MS,
+        "로그인 상태 확인 시간이 초과되었습니다.",
+      );
+    }
+
+    const { session, user } = authResult;
     logAuthDiagnostic("auth bootstrap", { event: "restoreSession", session, user });
+
     if (!user) {
+      clearAuthAutoReloadFlag();
       resetSignedOutState(getMissingStoredSessionMessage());
       return;
     }
+
+    clearAuthAutoReloadFlag();
     await initAuthenticatedUser(user, "restoreSession");
   } catch (error) {
-    renderSignedOut(getErrorMessage(error), true);
+    logAuthDiagnostic("auth bootstrap error", { error });
+
+    if (hasStoredAuthKeySafely() && tryAuthAutoReload()) {
+      renderSignedOut("로그인 연결을 다시 시작합니다.", false);
+      return;
+    }
+
+    renderSignedOut(`${getErrorMessage(error)} Google로 다시 로그인해주세요.`, true);
   } finally {
     window.clearTimeout(slowTimer);
+  }
+}
+
+function hasStoredAuthKeySafely() {
+  try {
+    return hasStoredAuthKey();
+  } catch {
+    return false;
+  }
+}
+
+function tryAuthAutoReload() {
+  try {
+    if (window.sessionStorage.getItem(AUTH_AUTO_RELOAD_KEY) === "1") {
+      return false;
+    }
+
+    window.sessionStorage.setItem(AUTH_AUTO_RELOAD_KEY, "1");
+    window.setTimeout(() => {
+      window.location.reload();
+    }, 250);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function clearAuthAutoReloadFlag() {
+  try {
+    window.sessionStorage.removeItem(AUTH_AUTO_RELOAD_KEY);
+  } catch {
+    // sessionStorage를 사용할 수 없어도 앱 실행에는 영향이 없습니다.
   }
 }
 
@@ -1522,6 +1593,10 @@ function showAdminCardStatus(message) {
   if (status) {
     status.textContent = message;
   }
+}
+
+function delay(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 function withTimeout(promise, timeoutMs, message) {
