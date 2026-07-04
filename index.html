@@ -133,10 +133,11 @@
             </label>
 
             <label>
-              <span>5. 메모</span>
+              <span>5. 이 결제는 누가 사용하나요?</span>
               <textarea
                 id="prepaymentMemo"
                 maxlength="80"
+                placeholder="이름을 입력해주세요"
                 rows="3"
               ></textarea>
             </label>
@@ -237,10 +238,10 @@
             <span class="card-title-line">
               <span class="top-card-name"></span>
               <span class="top-card-memo"></span>
+              <span class="status-badge"></span>
             </span>
             <span class="remaining-line">
               <strong class="remaining-text"></strong>
-              <span class="status-badge"></span>
             </span>
             <span class="summary-grid">
               <span>
@@ -265,6 +266,28 @@
         <div class="balance-detail"></div>
       </article>
     </template>
+
+
+    <div id="memoDialog" class="dialog-backdrop" hidden>
+      <section class="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="memoDialogTitle">
+        <h2 id="memoDialogTitle">실사용자 수정</h2>
+        <form id="memoDialogForm" autocomplete="off">
+          <label>
+            <span>이 결제는 누가 사용하나요?</span>
+            <input
+              id="memoDialogInput"
+              type="text"
+              maxlength="80"
+              placeholder="이름을 입력해주세요"
+            />
+          </label>
+          <div class="dialog-actions">
+            <button id="memoDialogBack" class="secondary-button" type="button">돌아가기</button>
+            <button id="memoDialogSave" class="primary-button" type="submit">저장</button>
+          </div>
+        </form>
+      </section>
+    </div>
 
     <div id="cancelDialog" class="dialog-backdrop" hidden>
       <section class="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="cancelDialogTitle">

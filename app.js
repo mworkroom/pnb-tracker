@@ -22,6 +22,7 @@ import {
   signOut,
   subscribeToWorkspaceData,
   updateCard,
+  updatePrepaymentMemo,
 } from "./supabaseService.js";
 
 const UNREGISTERED_VALUE = "__unregistered__";
@@ -55,6 +56,7 @@ const state = {
   searchLoading: false,
   searchTimer: null,
   pendingCancelPrepaymentId: null,
+  pendingMemoPrepaymentId: null,
   cancelledTransactionVisibleIds: new Set(),
   saving: false,
   realtimeUnsubscribe: null,
@@ -108,6 +110,11 @@ const els = {
   cancelDialog: document.querySelector("#cancelDialog"),
   cancelDialogBack: document.querySelector("#cancelDialogBack"),
   cancelDialogConfirm: document.querySelector("#cancelDialogConfirm"),
+  memoDialog: document.querySelector("#memoDialog"),
+  memoDialogForm: document.querySelector("#memoDialogForm"),
+  memoDialogInput: document.querySelector("#memoDialogInput"),
+  memoDialogBack: document.querySelector("#memoDialogBack"),
+  memoDialogSave: document.querySelector("#memoDialogSave"),
   adminDialog: document.querySelector("#adminDialog"),
   adminCloseButton: document.querySelector("#adminCloseButton"),
   adminContent: document.querySelector("#adminContent"),
@@ -187,6 +194,15 @@ function bindEvents() {
   });
   els.cancelDialog.addEventListener("click", (event) => {
     if (event.target === els.cancelDialog) closeCancelDialog();
+  });
+
+  els.memoDialogBack.addEventListener("click", closeMemoDialog);
+  els.memoDialogForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    void savePrepaymentMemo();
+  });
+  els.memoDialog.addEventListener("click", (event) => {
+    if (event.target === els.memoDialog) closeMemoDialog();
   });
 
   els.cardSelect.addEventListener("change", updateCardFields);
@@ -480,6 +496,10 @@ function resetSignedOutState(message = "선결제 잔액을 불러오려면 Goog
   state.searchQuery = "";
   state.searchResults = createEmptyData();
   state.searchLoading = false;
+  state.pendingCancelPrepaymentId = null;
+  state.pendingMemoPrepaymentId = null;
+  els.cancelDialog.hidden = true;
+  els.memoDialog.hidden = true;
   window.clearTimeout(state.searchTimer);
   renderSignedOut(message, true);
 }
@@ -744,6 +764,10 @@ function handleBalanceListClick(event) {
   const prepaymentAction = event.target.closest("[data-prepayment-action]");
   if (prepaymentAction) {
     const id = prepaymentAction.dataset.prepaymentId;
+    if (prepaymentAction.dataset.prepaymentAction === "editMemo") {
+      openMemoDialog(id);
+      return;
+    }
     if (prepaymentAction.dataset.prepaymentAction === "requestCancel") {
       openCancelDialog(id);
       return;
@@ -833,6 +857,37 @@ async function setTransactionStatus(transactionId, action) {
       state.completedOpen = false;
     }
   }, action === "cancel" ? "취소됨" : "복구됨");
+}
+
+function openMemoDialog(prepaymentId) {
+  const prepayment = findPrepayment(prepaymentId);
+  if (!prepayment) return;
+
+  state.pendingMemoPrepaymentId = prepaymentId;
+  els.memoDialogInput.value = prepayment.memo ?? "";
+  els.memoDialog.hidden = false;
+  window.setTimeout(() => {
+    els.memoDialogInput.focus();
+    els.memoDialogInput.select();
+  }, 0);
+}
+
+function closeMemoDialog() {
+  state.pendingMemoPrepaymentId = null;
+  els.memoDialogInput.value = "";
+  els.memoDialog.hidden = true;
+}
+
+async function savePrepaymentMemo() {
+  const prepaymentId = state.pendingMemoPrepaymentId;
+  if (!prepaymentId || state.saving) return;
+
+  const memo = els.memoDialogInput.value.trim();
+  await runMutation(async () => {
+    await updatePrepaymentMemo(state.membership, prepaymentId, memo);
+    state.openPrepaymentId = prepaymentId;
+    closeMemoDialog();
+  }, memo ? "실사용자 수정됨" : "실사용자 삭제됨");
 }
 
 function openCancelDialog(prepaymentId) {
@@ -1127,7 +1182,10 @@ function renderBalanceDetail(prepayment, used) {
   `
     : "";
   const registrationAction = canUse
-    ? `<button class="prepayment-cancel-button" type="button" data-prepayment-id="${escapeHtml(prepayment.id)}" data-prepayment-action="requestCancel" ${disabled}>이 선결제 등록 취소</button>`
+    ? `
+      <button class="prepayment-memo-button" type="button" data-prepayment-id="${escapeHtml(prepayment.id)}" data-prepayment-action="editMemo" ${disabled}>실사용자 수정</button>
+      <button class="prepayment-cancel-button" type="button" data-prepayment-id="${escapeHtml(prepayment.id)}" data-prepayment-action="requestCancel" ${disabled}>이 선결제 등록 취소</button>
+    `
     : "";
   const cancelledToggle = cancelledCount
     ? `

@@ -295,6 +295,7 @@ h2 {
 .secondary-button:focus-visible,
 .small-icon-button:focus-visible,
 .transaction-action:focus-visible,
+.prepayment-memo-button:focus-visible,
 .prepayment-cancel-button:focus-visible,
 .prepayment-restore-button:focus-visible,
 .danger-small-button:focus-visible,
@@ -322,33 +323,32 @@ select:focus-visible {
 
 .card-title-line {
   display: grid;
-  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   margin-bottom: 10px;
 }
 
 .top-card-name {
   display: inline-flex;
   min-width: 0;
+  justify-self: start;
 }
 
 .top-card-memo {
+  max-width: 9rem;
   min-width: 0;
   overflow: hidden;
-  color: var(--muted);
+  color: var(--text);
   font-size: 0.92rem;
-  font-weight: 850;
+  font-weight: 950;
   text-align: right;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .remaining-line {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 8px;
+  display: block;
   margin-bottom: 12px;
 }
 
@@ -374,6 +374,7 @@ select:focus-visible {
   color: var(--muted);
   font-size: 0.78rem;
   font-weight: 900;
+  white-space: nowrap;
 }
 
 .summary-grid {
@@ -596,11 +597,14 @@ label span {
 
 .prepayment-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
+  gap: 8px;
   border-top: 1px solid var(--line);
   padding-top: 10px;
 }
 
+.prepayment-memo-button,
 .prepayment-cancel-button,
 .prepayment-restore-button,
 .danger-small-button {
@@ -608,6 +612,13 @@ label span {
   border-radius: var(--radius);
   padding: 0 12px;
   font-weight: 950;
+}
+
+
+.prepayment-memo-button {
+  border: 1px solid var(--line-strong);
+  background: #ffffff;
+  color: var(--text);
 }
 
 .prepayment-cancel-button {

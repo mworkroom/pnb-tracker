@@ -230,6 +230,22 @@ export async function createPrepayment(membership, input) {
   return mapPrepayment(data);
 }
 
+export async function updatePrepaymentMemo(membership, prepaymentId, memo) {
+  requireMembership(membership);
+  const client = requireSupabase();
+  const normalizedMemo = String(memo ?? "").trim();
+  const { data, error } = await client
+    .from("prepayments")
+    .update({ memo: normalizedMemo || null })
+    .eq("workspace_id", membership.workspaceId)
+    .eq("id", prepaymentId)
+    .select(PREPAYMENT_SELECT)
+    .single();
+
+  if (error) throw error;
+  return mapPrepayment(data);
+}
+
 export async function cancelPrepayment(membership, prepaymentId) {
   requireMembership(membership);
   const client = requireSupabase();
