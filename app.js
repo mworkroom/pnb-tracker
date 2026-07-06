@@ -31,6 +31,9 @@ const SLOW_REQUEST_MS = 4000;
 const AUTH_TIMEOUT_MS = 20000;
 const INITIAL_AUTH_EVENT_TIMEOUT_MS = 10000;
 const AUTH_RETRY_DELAY_MS = 1200;
+const MEMBERSHIP_TIMEOUT_MS = 15000;
+const MEMBERSHIP_MAX_ATTEMPTS = 3;
+const MEMBERSHIP_RETRY_DELAY_MS = 1200;
 const AUTH_AUTO_RELOAD_KEY = "paynowbiz-auth-auto-reload";
 const AUTH_STORAGE_KEY = "paynowbiz-auth";
 const ADMIN_CANCELLED_PAGE_SIZE = 20;
@@ -72,6 +75,7 @@ const els = {
   authMessage: document.querySelector("#authMessage"),
   googleLoginButton: document.querySelector("#googleLoginButton"),
   authLogoutButton: document.querySelector("#authLogoutButton"),
+  authRetryButton: document.querySelector("#authRetryButton"),
   setupScreen: document.querySelector("#setupScreen"),
   setupMessage: document.querySelector("#setupMessage"),
   setupLogoutButton: document.querySelector("#setupLogoutButton"),
@@ -164,6 +168,9 @@ function bindEvents() {
   });
   els.authLogoutButton.addEventListener("click", () => {
     void handleLogout();
+  });
+  els.authRetryButton.addEventListener("click", () => {
+    void retryCurrentAuthCheck();
   });
   els.logoutButton.addEventListener("click", () => {
     void handleLogout();
@@ -446,13 +453,7 @@ async function loadForUser(user) {
   }, SLOW_REQUEST_MS);
 
   try {
-    logAuthDiagnostic("membership request start", { user });
-    const membership = await withTimeout(
-      getCurrentMembership(user),
-      AUTH_TIMEOUT_MS,
-      "워크스페이스 권한 확인 시간이 초과되었습니다. 새로고침 후 다시 로그인해주세요.",
-    );
-    logAuthDiagnostic("membership request success", { user, membership });
+    const membership = await getCurrentMembershipWithRetry(user);
     if (state.user?.id !== user.id) return;
     if (!membership) {
       state.membership = null;
@@ -468,9 +469,66 @@ async function loadForUser(user) {
   } catch (error) {
     logAuthDiagnostic("membership request error", { user, error });
     if (state.user?.id !== user.id) return;
-    renderSignedOut(getErrorMessage(error), true);
+    renderSignedOut(
+      `${getErrorMessage(error)} 로그인은 유지되어 있습니다. 잠시 후 다시 확인을 눌러주세요.`,
+      false,
+      { canLogout: true, canRetry: true },
+    );
   } finally {
     window.clearTimeout(slowTimer);
+  }
+}
+
+async function getCurrentMembershipWithRetry(user) {
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= MEMBERSHIP_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      logAuthDiagnostic("membership request start", { user, event: `attempt ${attempt}` });
+      const membership = await withTimeout(
+        getCurrentMembership(user),
+        MEMBERSHIP_TIMEOUT_MS,
+        "워크스페이스 권한 확인 응답이 지연되고 있습니다.",
+      );
+      logAuthDiagnostic("membership request success", { user, membership, event: `attempt ${attempt}` });
+      return membership;
+    } catch (error) {
+      lastError = error;
+      logAuthDiagnostic("membership request retry", { user, error, event: `attempt ${attempt}` });
+
+      if (attempt >= MEMBERSHIP_MAX_ATTEMPTS || state.user?.id !== user.id) {
+        break;
+      }
+
+      renderSignedOut(
+        `워크스페이스 권한 확인이 지연되고 있습니다. 자동으로 다시 확인하는 중입니다. (${attempt + 1}/${MEMBERSHIP_MAX_ATTEMPTS})`,
+        false,
+        { canLogout: true },
+      );
+      await delay(MEMBERSHIP_RETRY_DELAY_MS * attempt);
+    }
+  }
+
+  throw lastError ?? new Error("워크스페이스 권한을 확인하지 못했습니다.");
+}
+
+async function retryCurrentAuthCheck() {
+  if (state.user?.id) {
+    await initAuthenticatedUser(state.user, "manualRetry");
+    return;
+  }
+
+  renderSignedOut("로그인 상태를 다시 확인하는 중입니다.", false);
+  try {
+    const { user } = await getCurrentSession();
+    if (user) {
+      await initAuthenticatedUser(user, "manualRetry");
+      return;
+    }
+
+    resetSignedOutState();
+  } catch (error) {
+    renderSignedOut(getErrorMessage(error), true);
   }
 }
 
@@ -513,6 +571,8 @@ function renderSignedOut(message, canLogin, options = {}) {
   els.authMessage.textContent = message;
   els.googleLoginButton.hidden = !canLogin;
   els.googleLoginButton.disabled = !canLogin;
+  els.authRetryButton.hidden = !options.canRetry;
+  els.authRetryButton.disabled = !options.canRetry;
   els.authLogoutButton.hidden = !options.canLogout;
   els.authLogoutButton.disabled = !options.canLogout;
 }
