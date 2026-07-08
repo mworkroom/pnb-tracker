@@ -301,7 +301,7 @@ h2 {
 }
 
 .balance-card.is-open {
-  border-color: rgba(37, 183, 232, 0.42);
+
 }
 
 .balance-toggle {
@@ -598,11 +598,11 @@ label span {
 }
 
 .transaction-action {
-  min-width: 70px;
-  min-height: 44px;
+  min-width: 40px;
+  min-height: 40px;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius);
-  padding: 0 10px;
+  padding: 0 8px;
   background: var(--panel);
   color: var(--text);
   font-size: 0.9rem;
@@ -632,7 +632,7 @@ label span {
 .prepayment-restore-button,
 .danger-small-button {
   min-height: 40px;
-  min-width: 49%;
+  min-width: 48%;
   border-radius: var(--radius);
   padding: 0 12px;
   font-size: 0.9rem;
@@ -1082,7 +1082,7 @@ input {
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  min-height: 52px;
+  min-height: 40px;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius);
   padding: 0 12px;
@@ -1203,7 +1203,7 @@ input[type="date"]::-webkit-datetime-edit {
 
 .primary-button,
 .secondary-button {
-  min-height: 52px;
+  min-height: 40px;
   border-radius: var(--radius);
   font-weight: 800;
   font-size: 1rem;
