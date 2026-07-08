@@ -7,6 +7,7 @@ const PREPAYMENT_SELECT =
   "id, workspace_id, card_id, card_type, card_name_snapshot, card_first4_snapshot, card_last4_snapshot, card_color_snapshot, unregistered_card_memo, approval_number, approval_date, approval_amount, memo, status, created_by, created_at, updated_at, last_activity_at";
 const TRANSACTION_SELECT =
   "id, workspace_id, prepayment_id, amount, transaction_date, status, created_by, created_at, updated_at";
+const CATALOGUE_WORKSPACE_ID = "00000000-0000-0000-0000-000000000002";
 const RECENT_COMPLETED_MONTHS = 12;
 const RECENT_APPROVAL_DUPLICATE_MONTHS = 12;
 
@@ -52,8 +53,9 @@ export async function getCurrentMembership(currentUser = null) {
   const user = currentUser ?? (await getAuthenticatedUser());
   const { data, error } = await client
     .from("workspace_members")
-    .select("workspace_id, role, created_at, workspace:workspaces(id, name, created_at)")
+    .select("workspace_id, role, created_at")
     .eq("user_id", user.id)
+    .neq("workspace_id", CATALOGUE_WORKSPACE_ID)
     .order("created_at", { ascending: true })
     .limit(1)
     .maybeSingle();
@@ -65,13 +67,11 @@ export async function getCurrentMembership(currentUser = null) {
     workspaceId: data.workspace_id,
     role: data.role,
     createdAt: data.created_at,
-    workspace: data.workspace
-      ? {
-          id: data.workspace.id,
-          name: data.workspace.name,
-          createdAt: data.workspace.created_at,
-        }
-      : null,
+    workspace: {
+      id: data.workspace_id,
+      name: "PayNowBiz",
+      createdAt: null,
+    },
     user,
   };
 }

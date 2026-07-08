@@ -33,6 +33,7 @@ const INITIAL_AUTH_EVENT_TIMEOUT_MS = 10000;
 const AUTH_RETRY_DELAY_MS = 1200;
 const AUTH_AUTO_RELOAD_KEY = "paynowbiz-auth-auto-reload";
 const AUTH_STORAGE_KEY = "paynowbiz-auth";
+const MEMBERSHIP_CACHE_KEY = "paynowbiz-membership";
 const ADMIN_CANCELLED_PAGE_SIZE = 20;
 
 const state = {
@@ -430,12 +431,27 @@ function initAuthenticatedUser(user, source) {
 async function loadForUser(user) {
   state.user = user;
   clearOAuthCallbackFromUrl();
-  renderSignedOut("워크스페이스 권한을 확인하는 중입니다.", false, { canLogout: true });
-  const slowTimer = window.setTimeout(() => {
-    renderSignedOut("워크스페이스 권한 확인이 조금 오래 걸리고 있습니다. Supabase 응답을 기다리는 중입니다.", false, {
-      canLogout: true,
+  const cachedMembership = readCachedMembership(user);
+  let openedFromCache = false;
+  let slowTimer = null;
+
+  if (cachedMembership) {
+    openedFromCache = true;
+    state.membership = cachedMembership;
+    showAppShell();
+    setupRealtime();
+    void refreshWorkspaceData("", { silent: true }).catch((error) => {
+      logAuthDiagnostic("cached workspace refresh error", { user, error });
+      showStatus(getErrorMessage(error));
     });
-  }, SLOW_REQUEST_MS);
+  } else {
+    renderSignedOut("워크스페이스 권한을 확인하는 중입니다.", false, { canLogout: true });
+    slowTimer = window.setTimeout(() => {
+      renderSignedOut("워크스페이스 권한 확인이 조금 오래 걸리고 있습니다. Supabase 응답을 기다리는 중입니다.", false, {
+        canLogout: true,
+      });
+    }, SLOW_REQUEST_MS);
+  }
 
   try {
     logAuthDiagnostic("membership request start", { user });
@@ -449,25 +465,94 @@ async function loadForUser(user) {
     if (!membership) {
       state.membership = null;
       state.data = createEmptyData();
+      clearCachedMembership();
       showSetupMessage();
       return;
     }
 
     state.membership = membership;
+    writeCachedMembership(user, membership);
     showAppShell();
     setupRealtime();
-    await refreshWorkspaceData("Loading", { silent: true });
+    await refreshWorkspaceData(openedFromCache ? "" : "Loading", { silent: true });
   } catch (error) {
     logAuthDiagnostic("membership request error", { user, error });
     if (state.user?.id !== user.id) return;
+    if (openedFromCache) {
+      showStatus("저장된 권한으로 앱을 열었습니다. 권한 확인은 다음 실행 때 다시 시도합니다.");
+      return;
+    }
     renderSignedOut(getErrorMessage(error), true);
   } finally {
-    window.clearTimeout(slowTimer);
+    if (slowTimer) {
+      window.clearTimeout(slowTimer);
+    }
   }
+}
+
+function readCachedMembership(user) {
+  try {
+    const rawValue = window.localStorage.getItem(MEMBERSHIP_CACHE_KEY);
+    if (!rawValue) return null;
+
+    const parsed = JSON.parse(rawValue);
+    const membership = parsed?.membership;
+    if (parsed?.userId !== user.id || !isCachedMembership(membership)) {
+      return null;
+    }
+
+    return {
+      workspaceId: membership.workspaceId,
+      role: membership.role,
+      createdAt: membership.createdAt,
+      workspace: membership.workspace,
+      user,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedMembership(user, membership) {
+  try {
+    window.localStorage.setItem(
+      MEMBERSHIP_CACHE_KEY,
+      JSON.stringify({
+        userId: user.id,
+        membership: {
+          workspaceId: membership.workspaceId,
+          role: membership.role,
+          createdAt: membership.createdAt,
+          workspace: membership.workspace,
+        },
+      }),
+    );
+  } catch {
+    // 권한 캐시는 편의 기능이므로 저장에 실패해도 앱 실행을 막지 않습니다.
+  }
+}
+
+function clearCachedMembership() {
+  try {
+    window.localStorage.removeItem(MEMBERSHIP_CACHE_KEY);
+  } catch {
+    // localStorage를 사용할 수 없는 환경에서는 지울 캐시도 없습니다.
+  }
+}
+
+function isCachedMembership(membership) {
+  return (
+    membership &&
+    typeof membership.workspaceId === "string" &&
+    typeof membership.role === "string" &&
+    "createdAt" in membership &&
+    "workspace" in membership
+  );
 }
 
 function resetSignedOutState(message = "선결제 잔액을 불러오려면 Google 계정으로 로그인하세요.") {
   teardownRealtime();
+  clearCachedMembership();
   state.authInitUserId = null;
   state.authInitPromise = null;
   state.user = null;
