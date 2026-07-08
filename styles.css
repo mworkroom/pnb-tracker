@@ -1,20 +1,23 @@
 :root {
-  --page: #f0f0f0;
+  --page: #f4f5f7;
   --panel: #ffffff;
-  --panel-soft: #f7f7f7;
-  --panel-recessed: #ebebeb;
-  --line: #e0e0e0;
-  --line-strong: #c4c4c4;
-  --text: #1e1e1e;
-  --muted: #6a6a6a;
-  --button: #222222;
-  --button-soft: #eeeeee;
+  --panel-soft: #f8fafc;
+  --panel-recessed: #eef2f6;
+  --line: #d9dde3;
+  --line-strong: #b8c2cc;
+  --text: #111827;
+  --muted: #606b78;
+  --accent: #25b7e8;
+  --accent-strong: #0aa5dc;
+  --accent-soft: #e8f8fd;
+  --button: var(--accent);
+  --button-soft: #eef1f4;
   --danger: #9f3434;
   --success: #256f45;
-  --shadow: 0 2px 8px rgba(0, 0, 0, 0.07), 0 0 0 1px rgba(0,0,0,0.04);
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
-  --radius: 10px;
-  --radius-sm: 7px;
+  --shadow: 0 4px 16px rgba(17, 24, 39, 0.06);
+  --shadow-sm: 0 1px 3px rgba(17, 24, 39, 0.05);
+  --radius: 8px;
+  --radius-sm: 6px;
 }
 
 *,
@@ -40,11 +43,13 @@ body {
   color: var(--text);
   background: var(--page);
   font-family:
-    ui-sans-serif,
+    "Noto Sans KR",
+    "Noto Sans",
     system-ui,
     -apple-system,
     BlinkMacSystemFont,
     "Segoe UI",
+    Arial,
     sans-serif;
 }
 
@@ -77,7 +82,13 @@ button {
 .app-shell {
   width: min(100%, 720px);
   margin: 0 auto;
-  padding: 16px 12px calc(32px + env(safe-area-inset-bottom));
+  padding: 0 12px calc(32px + env(safe-area-inset-bottom));
+}
+
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  border-color: var(--accent);
 }
 
 .app-header {
@@ -85,9 +96,13 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 4px 2px 18px;
-  border-bottom: 1px solid var(--line);
-  margin-bottom: 20px;
+  min-height: 70px;
+  margin: 0 -12px 16px;
+  padding: 13px 14px;
+  border-bottom: 0;
+  background: var(--accent);
+  color: #ffffff;
+  box-shadow: var(--shadow);
 }
 
 .auth-screen {
@@ -112,7 +127,7 @@ button {
 .auth-panel p {
   margin: 0;
   color: var(--muted);
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1.45;
 }
 
@@ -176,28 +191,32 @@ h2 {
 h1 {
   font-size: 1.22rem;
   font-weight: 800;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
   color: var(--text);
   padding-left: 2px;
 }
 
+.app-header h1 {
+  color: #ffffff;
+}
+
 h2 {
   font-size: 1.08rem;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .secondary-tools h2,
 .secondary-tools .completed-toggle strong {
   font-size: 1rem;
-  font-weight: 950;
+  font-weight: 800;
 }
 
 .save-status {
   min-width: 68px;
   min-height: 24px;
-  color: var(--success);
+  color: rgba(255, 255, 255, 0.92);
   font-size: 0.86rem;
-  font-weight: 900;
+  font-weight: 800;
   text-align: right;
 }
 
@@ -205,34 +224,31 @@ h2 {
 .completed-section,
 .new-panel,
 .search-panel {
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .new-panel,
 .secondary-tools {
   position: relative;
-  margin-top: 28px;
+  margin-top: 18px;
 }
 
 .new-panel::before,
 .secondary-tools::before {
-  content: "";
-  position: absolute;
-  top: -16px;
-  right: 2px;
-  left: 2px;
-  border-top: 1px solid var(--line);
+  content: none;
 }
 
 .secondary-tools {
   display: grid;
-  gap: 10px;
+  gap: 8px;
+  margin-top: 16px;
 }
 
 .secondary-tools .completed-section,
 .secondary-tools .search-panel {
   margin-bottom: 0;
   background: var(--panel);
+  box-shadow: none;
 }
 
 .secondary-tools .completed-toggle {
@@ -244,7 +260,7 @@ h2 {
   align-items: left;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 10px;
   padding: 0px; 
 }
 
@@ -256,7 +272,7 @@ h2 {
 
 .balance-list {
   display: grid;
-  gap: 10px;
+  gap: 9px;
 }
 
 .balance-card,
@@ -270,19 +286,29 @@ h2 {
   overflow: hidden;
 }
 
+.new-panel {
+  border-color: rgba(37, 183, 232, 0.34);
+  background: var(--accent-soft);
+}
+
+.secondary-tools .completed-section,
+.secondary-tools .search-panel {
+  border-color: var(--line);
+}
+
 .balance-card {
-  /* overflow already set above */
+  box-shadow: var(--shadow-sm);
 }
 
 .balance-card.is-open {
-  border-color: var(--line-strong);
+  border-color: rgba(37, 183, 232, 0.42);
 }
 
 .balance-toggle {
   position: relative;
   display: block;
   width: 100%;
-  min-height: 128px;
+  min-height: 122px;
   border: 0;
   padding: 14px 14px 14px 18px;
   background: var(--panel);
@@ -304,14 +330,14 @@ h2 {
 input:focus-visible,
 textarea:focus-visible,
 select:focus-visible {
-  outline: 3px solid rgba(61, 61, 61, 0.18);
+  outline: 3px solid rgba(37, 183, 232, 0.18);
   outline-offset: 2px;
 }
 
 .accent {
   position: absolute;
   inset: 0 auto 0 0;
-  width: 5px;
+  width: 4px;
   background: #8a8a8a;
 }
 
@@ -341,7 +367,7 @@ select:focus-visible {
   overflow: hidden;
   color: var(--text);
   font-size: 0.92rem;
-  font-weight: 950;
+  font-weight: 800;
   text-align: right;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -355,14 +381,11 @@ select:focus-visible {
 .remaining-text {
   display: block;
   min-width: 0;
-  border-radius: var(--radius-sm);
-  padding: 8px 10px;
-  background: var(--panel-recessed);
   overflow-wrap: anywhere;
   color: var(--text);
-  font-size: 1.25rem;
-  font-weight: 950;
-  letter-spacing: -0.02em;
+  font-size: 1.32rem;
+  font-weight: 850;
+  letter-spacing: 0;
 }
 
 .status-badge {
@@ -370,10 +393,10 @@ select:focus-visible {
   border: 1px solid var(--line);
   border-radius: 999px;
   padding: 5px 9px;
-  background: var(--panel-soft);
-  color: var(--muted);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
   font-size: 0.78rem;
-  font-weight: 900;
+  font-weight: 750;
   white-space: nowrap;
 }
 
@@ -393,7 +416,7 @@ label span {
   margin-bottom: 4px;
   color: var(--muted);
   font-size: 0.78rem;
-  font-weight: 850;
+  font-weight: 700;
 }
 
 .summary-grid b {
@@ -402,7 +425,7 @@ label span {
   overflow: hidden;
   color: var(--text);
   font-size: 0.92rem;
-  font-weight: 850;
+  font-weight: 750;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -424,7 +447,7 @@ label span {
   padding: 4px 8px;
   color: #ffffff;
   font-size: 1.18rem;
-  font-weight: 950;
+  font-weight: 850;
   line-height: 1.2;
 }
 
@@ -432,7 +455,7 @@ label span {
   display: none;
   border-top: 1px solid var(--line);
   padding: 12px;
-  background: var(--panel-recessed);
+  background: var(--panel-soft);
 }
 
 .balance-card.is-open .balance-detail {
@@ -481,7 +504,7 @@ label span {
   border: 1px solid var(--line);
   color: var(--text);
   font-size: 0.98rem;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .remaining-detail strong {
@@ -518,7 +541,7 @@ label span {
   margin: 2px 0 0;
   color: var(--text);
   font-size: 0.98rem;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .transaction-list {
@@ -561,13 +584,13 @@ label span {
   margin: 0;
   color: var(--text);
   font-size: 0.92rem;
-  font-weight: 850;
+  font-weight: 750;
   line-height: 1.35;
 }
 
 .transaction-line strong {
   font-size: 1rem;
-  font-weight: 950;
+  font-weight: 850;
 }
 
 .transaction-date {
@@ -580,10 +603,10 @@ label span {
   border: 1px solid var(--line-strong);
   border-radius: var(--radius);
   padding: 0 10px;
-  background: var(--button-soft);
+  background: var(--panel);
   color: var(--text);
   font-size: 0.9rem;
-  font-weight: 900;
+  font-weight: 800;
   white-space: nowrap;
 }
 
@@ -708,7 +731,7 @@ label span {
 
 .admin-tabs {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -723,11 +746,11 @@ label span {
   background: transparent;
   color: var(--muted);
   font-size: 0.9rem;
-  font-weight: 950;
+  font-weight: 800;
 }
 
 .admin-tab.is-active {
-  background: var(--button);
+  background: var(--accent);
   color: #ffffff;
 }
 
@@ -757,7 +780,7 @@ label span {
   margin: 0;
   color: var(--text);
   font-size: 1rem;
-  font-weight: 950;
+  font-weight: 800;
   padding-left: 10px;
 }
 
@@ -899,7 +922,7 @@ label span {
   justify-content: space-between;
   gap: 12px;
   width: 100%;
-  min-height: 60px;
+  min-height: 56px;
   border: 0;
   padding: 12px 14px;
   background: var(--panel);
@@ -914,7 +937,7 @@ label span {
 
 .completed-toggle strong {
   font-size: 1rem;
-  font-weight: 950;
+  font-weight: 800;
 }
 
 .completed-toggle small {
@@ -927,17 +950,21 @@ label span {
 .toggle-mark {
   color: var(--muted);
   font-size: 0.85rem;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .completed-list {
   border-top: 1px solid var(--line);
   padding: 10px;
-  background: var(--panel-recessed);
+  background: var(--panel-soft);
 }
 
 .new-panel {
   padding: 14px;
+}
+
+.new-panel .section-heading h2 {
+  color: var(--accent-strong);
 }
 
 .search-panel {
@@ -987,7 +1014,12 @@ label span {
   gap: 8px;
   border-top: 1px solid var(--line);
   padding: 10px;
-  background: var(--panel-recessed);
+  background: var(--panel-soft);
+}
+
+.admin-archive-list {
+  border-top: 0;
+  padding: 0;
 }
 
 .archive-year-section {
@@ -1054,7 +1086,7 @@ input {
   border: 1px solid var(--line-strong);
   border-radius: var(--radius);
   padding: 0 12px;
-  background: var(--panel-recessed);
+  background: var(--panel);
   color: var(--text);
   font-size: 16px;
   line-height: 1.2;
@@ -1070,7 +1102,7 @@ textarea {
 }
 
 input[readonly] {
-  background: #f1f1f1;
+  background: var(--panel-soft);
   color: var(--muted);
 }
 
@@ -1160,9 +1192,9 @@ input[type="date"]::-webkit-datetime-edit {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 10px 12px;
-  background: var(--panel-soft);
+  background: rgba(255, 255, 255, 0.72);
   color: var(--muted);
-  font-weight: 850;
+  font-weight: 750;
 }
 
 .card-preview strong {
@@ -1173,7 +1205,7 @@ input[type="date"]::-webkit-datetime-edit {
 .secondary-button {
   min-height: 52px;
   border-radius: var(--radius);
-  font-weight: 950;
+  font-weight: 800;
   font-size: 1rem;
   transition: opacity 0.12s;
 }
@@ -1182,7 +1214,7 @@ input[type="date"]::-webkit-datetime-edit {
   border: 0;
   background: var(--button);
   color: #ffffff;
-  letter-spacing: 0.01em;
+  letter-spacing: 0;
 }
 
 .primary-button:active {
@@ -1190,7 +1222,7 @@ input[type="date"]::-webkit-datetime-edit {
 }
 
 .secondary-button {
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--line);
   background: var(--button-soft);
   color: var(--text);
 }

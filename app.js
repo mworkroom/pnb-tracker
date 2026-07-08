@@ -51,6 +51,7 @@ const state = {
   archiveExpandedYear: null,
   archiveYears: [],
   archiveDataByYear: new Map(),
+  archiveLoading: false,
   searchQuery: "",
   searchResults: createEmptyData(),
   searchLoading: false,
@@ -90,9 +91,6 @@ const els = {
   searchSection: document.querySelector("#searchSection"),
   searchSummary: document.querySelector("#searchSummary"),
   searchList: document.querySelector("#searchList"),
-  archiveToggle: document.querySelector("#archiveToggle"),
-  archiveSummary: document.querySelector("#archiveSummary"),
-  archiveYearList: document.querySelector("#archiveYearList"),
   prepaymentForm: document.querySelector("#prepaymentForm"),
   prepaymentSubmit: document.querySelector("#prepaymentSubmit"),
   cardSelect: document.querySelector("#cardSelect"),
@@ -175,6 +173,7 @@ function bindEvents() {
   els.adminCloseButton.addEventListener("click", closeAdminDialog);
   els.adminDialog.addEventListener("click", handleAdminClick);
   els.adminContent.addEventListener("submit", handleAdminSubmit);
+  els.adminContent.addEventListener("submit", handleUsageSubmit);
 
   els.completedToggle.addEventListener("click", () => {
     state.completedOpen = !state.completedOpen;
@@ -183,10 +182,6 @@ function bindEvents() {
 
   els.searchInput.addEventListener("input", handleSearchInput);
   els.searchClearButton.addEventListener("click", clearSearch);
-
-  els.archiveToggle.addEventListener("click", () => {
-    void toggleArchive();
-  });
 
   els.cancelDialogBack.addEventListener("click", closeCancelDialog);
   els.cancelDialogConfirm.addEventListener("click", () => {
@@ -223,12 +218,9 @@ function bindEvents() {
   els.activeList.addEventListener("click", handleBalanceListClick);
   els.completedList.addEventListener("click", handleBalanceListClick);
   els.searchList.addEventListener("click", handleBalanceListClick);
-  els.archiveYearList.addEventListener("click", handleArchiveClick);
-  els.archiveYearList.addEventListener("click", handleBalanceListClick);
   els.activeList.addEventListener("submit", handleUsageSubmit);
   els.completedList.addEventListener("submit", handleUsageSubmit);
   els.searchList.addEventListener("submit", handleUsageSubmit);
-  els.archiveYearList.addEventListener("submit", handleUsageSubmit);
 
   document.addEventListener("input", (event) => {
     if (event.target.matches("[data-usage-amount]")) {
@@ -493,6 +485,7 @@ function resetSignedOutState(message = "선결제 잔액을 불러오려면 Goog
   state.archiveExpandedYear = null;
   state.archiveYears = [];
   state.archiveDataByYear = new Map();
+  state.archiveLoading = false;
   state.searchQuery = "";
   state.searchResults = createEmptyData();
   state.searchLoading = false;
@@ -757,7 +750,7 @@ function handleBalanceListClick(event) {
   if (toggle) {
     const id = toggle.dataset.balanceToggle;
     state.openPrepaymentId = state.openPrepaymentId === id ? null : id;
-    render();
+    renderBalanceViews();
     return;
   }
 
@@ -782,7 +775,7 @@ function handleBalanceListClick(event) {
     } else {
       state.cancelledTransactionVisibleIds.add(prepaymentId);
     }
-    render();
+    renderBalanceViews();
     return;
   }
 
@@ -790,6 +783,13 @@ function handleBalanceListClick(event) {
   if (!action) return;
 
   void setTransactionStatus(action.dataset.transactionId, action.dataset.transactionAction);
+}
+
+function renderBalanceViews() {
+  render();
+  if (!els.adminDialog.hidden && state.adminTab === "archive") {
+    renderAdmin();
+  }
 }
 
 function handleUsageSubmit(event) {
@@ -1014,21 +1014,22 @@ function renderSearchResults() {
   renderBalanceList(els.searchList, state.searchResults.prepayments, "검색 결과가 없습니다.");
 }
 
-async function toggleArchive() {
-  state.archiveOpen = !state.archiveOpen;
-  if (state.archiveOpen && !state.archiveYears.length) {
-    await refreshArchiveYears();
-  }
-  renderArchive();
-}
-
-async function refreshArchiveYears() {
+async function refreshArchiveYears(options = {}) {
   if (!state.membership) return;
+  state.archiveLoading = true;
+  if (options.renderAfter) {
+    renderAdmin();
+  }
   try {
     state.archiveYears = await loadArchiveYears(state.membership);
   } catch (error) {
     showStatus(getErrorMessage(error));
     state.archiveYears = [];
+  } finally {
+    state.archiveLoading = false;
+    if (options.renderAfter) {
+      renderAdmin();
+    }
   }
 }
 
@@ -1061,22 +1062,20 @@ async function loadArchiveYearIntoState(year, options = {}) {
 }
 
 function renderArchive() {
-  els.archiveSummary.textContent = state.archiveYears.length ? `${state.archiveYears.length}개 연도` : "";
-  els.archiveToggle.setAttribute("aria-expanded", String(state.archiveOpen));
-  els.archiveToggle.querySelector(".toggle-mark").textContent = state.archiveOpen ? "닫기" : "열기";
-  els.archiveYearList.hidden = !state.archiveOpen;
+  const archiveList = getArchiveListContainer();
+  if (!archiveList) return;
 
-  if (!state.archiveOpen) {
-    els.archiveYearList.innerHTML = "";
+  if (state.archiveLoading) {
+    archiveList.innerHTML = `<div class="empty-state">이전 기록을 불러오는 중입니다.</div>`;
     return;
   }
 
   if (!state.archiveYears.length) {
-    els.archiveYearList.innerHTML = `<div class="empty-state">이전 기록이 없습니다.</div>`;
+    archiveList.innerHTML = `<div class="empty-state">이전 기록이 없습니다.</div>`;
     return;
   }
 
-  els.archiveYearList.innerHTML = state.archiveYears
+  archiveList.innerHTML = state.archiveYears
     .map((item) => {
       const expanded = state.archiveExpandedYear === item.year;
       return `
@@ -1093,7 +1092,7 @@ function renderArchive() {
 
   if (!state.archiveExpandedYear) return;
 
-  const container = els.archiveYearList.querySelector(`[data-archive-list-year="${state.archiveExpandedYear}"]`);
+  const container = archiveList.querySelector(`[data-archive-list-year="${state.archiveExpandedYear}"]`);
   const yearData = state.archiveDataByYear.get(state.archiveExpandedYear);
   if (!container) return;
   if (!yearData || yearData.loading) {
@@ -1105,6 +1104,11 @@ function renderArchive() {
     return;
   }
   renderBalanceList(container, yearData.prepayments, "해당 연도 기록이 없습니다.");
+}
+
+function getArchiveListContainer() {
+  if (els.adminDialog.hidden || state.adminTab !== "archive") return null;
+  return els.adminContent.querySelector("[data-admin-archive-list]");
 }
 
 function renderBalanceList(container, prepayments, emptyMessage = "사용 중인 잔액이 없습니다.") {
@@ -1148,7 +1152,7 @@ function renderBalanceList(container, prepayments, emptyMessage = "사용 중인
 }
 
 function renderBalanceDetail(prepayment, used) {
-  const allTransactions = state.data.transactions
+  const allTransactions = getLoadedTransactions()
     .filter((transaction) => transaction.prepaymentId === prepayment.id)
     .sort(sortTransactions);
   const cancelledCount = allTransactions.filter((transaction) => transaction.status === "cancelled").length;
@@ -1255,6 +1259,10 @@ function openAdminDialog() {
   window.scrollTo(0, 0);
   renderAdmin();
   void refreshAdminCancelled({ renderAfter: true });
+  if (state.adminTab === "archive" && !state.archiveYears.length) {
+    state.archiveOpen = true;
+    void refreshArchiveYears({ renderAfter: true });
+  }
 }
 
 function closeAdminDialog() {
@@ -1293,6 +1301,11 @@ function renderAdmin() {
 
   if (state.adminTab === "backup") {
     renderAdminBackupTab();
+    return;
+  }
+
+  if (state.adminTab === "archive") {
+    renderAdminArchiveTab();
     return;
   }
 
@@ -1359,6 +1372,22 @@ function renderAdminBackupTab() {
       </div>
     </section>
   `;
+  applyBusyState();
+}
+
+function renderAdminArchiveTab() {
+  const summary = state.archiveYears.length ? `${state.archiveYears.length}개 연도` : "1년 경과 기록";
+  els.adminContent.innerHTML = `
+    <section class="admin-section admin-archive-section">
+      <div class="admin-section-heading">
+        <h3>이전 기록</h3>
+        <small>${summary}</small>
+      </div>
+      <p class="metadata">1년이 지난 기록은 메인 화면에서 숨기고 관리자 모드에서만 확인합니다.</p>
+      <div class="archive-year-list-wrap admin-archive-list" data-admin-archive-list></div>
+    </section>
+  `;
+  renderArchive();
   applyBusyState();
 }
 
@@ -1539,7 +1568,27 @@ function handleAdminClick(event) {
   const tabButton = event.target.closest("[data-admin-tab]");
   if (tabButton) {
     state.adminTab = tabButton.dataset.adminTab;
+    if (state.adminTab === "archive") {
+      state.archiveOpen = true;
+    }
     renderAdmin();
+    if (state.adminTab === "archive" && !state.archiveYears.length) {
+      void refreshArchiveYears({ renderAfter: true });
+    }
+    return;
+  }
+
+  const archiveYearButton = event.target.closest("[data-archive-year]");
+  if (archiveYearButton) {
+    void handleArchiveClick(event);
+    return;
+  }
+
+  const archiveBalanceControl = event.target.closest(
+    "[data-balance-toggle], [data-prepayment-action], [data-cancelled-transactions-toggle], [data-transaction-action]",
+  );
+  if (archiveBalanceControl && state.adminTab === "archive") {
+    handleBalanceListClick(event);
     return;
   }
 
