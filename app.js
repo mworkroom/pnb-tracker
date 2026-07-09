@@ -29,8 +29,7 @@ const UNREGISTERED_VALUE = "__unregistered__";
 const DEFAULT_UNREGISTERED_COLOR = "#8a8a8a";
 const SLOW_REQUEST_MS = 4000;
 const AUTH_TIMEOUT_MS = 20000;
-const INITIAL_AUTH_EVENT_TIMEOUT_MS = 10000;
-const AUTH_RETRY_DELAY_MS = 1200;
+const AUTH_STALLED_RELOAD_MS = 8000;
 const AUTH_AUTO_RELOAD_KEY = "paynowbiz-auth-auto-reload";
 const AUTH_STORAGE_KEY = "paynowbiz-auth";
 const MEMBERSHIP_CACHE_KEY = "paynowbiz-membership";
@@ -63,6 +62,7 @@ const state = {
   saving: false,
   realtimeUnsubscribe: null,
   realtimeRefreshTimer: null,
+  authRestorePromise: null,
   authInitUserId: null,
   authInitPromise: null,
 };
@@ -131,18 +131,8 @@ async function init() {
     return;
   }
 
-  let resolveInitialAuth;
-  const initialAuthPromise = new Promise((resolve) => {
-    resolveInitialAuth = resolve;
-  });
-
   onAuthStateChange((event, session) => {
     logAuthDiagnostic("auth event", { event, session });
-
-    if (event === "INITIAL_SESSION") {
-      resolveInitialAuth({ session, user: session?.user ?? null });
-      return;
-    }
 
     if (event === "SIGNED_OUT") {
       resetSignedOutState();
@@ -154,7 +144,8 @@ async function init() {
     scheduleAuthenticatedUserInit(session.user, event);
   });
 
-  await restoreSession(initialAuthPromise);
+  bindAuthLifecycleEvents();
+  await restoreSession("startup");
 }
 
 function bindEvents() {
@@ -230,39 +221,57 @@ function bindEvents() {
   });
 }
 
-async function restoreSession(initialAuthPromise) {
+function bindAuthLifecycleEvents() {
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted && !state.user) {
+      void restoreSession("pageshow");
+    }
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && !state.user) {
+      void restoreSession("visible");
+    }
+  });
+}
+
+function restoreSession(source = "startup") {
+  if (state.authRestorePromise) {
+    return state.authRestorePromise;
+  }
+
+  state.authRestorePromise = restoreSessionOnce(source).finally(() => {
+    state.authRestorePromise = null;
+  });
+
+  return state.authRestorePromise;
+}
+
+async function restoreSessionOnce(source) {
   if (!canUseAuthStorage()) {
     renderSignedOut("이 브라우저에서 로그인 저장소를 사용할 수 없습니다. 사이트 데이터/개인정보 보호 설정을 확인해주세요.", true);
     return;
   }
 
   renderSignedOut("로그인 상태를 확인하는 중입니다.", false);
+  let reloadTimer = null;
   const slowTimer = window.setTimeout(() => {
-    renderSignedOut("로그인 확인이 조금 오래 걸리고 있습니다. 자동으로 다시 확인하는 중입니다.", false);
+    renderSignedOut("로그인 확인이 조금 오래 걸리고 있습니다. 자동으로 새로고침합니다.", false);
+    reloadTimer = window.setTimeout(() => {
+      if (!state.user && hasStoredAuthKeySafely()) {
+        tryAuthAutoReload();
+      }
+    }, AUTH_STALLED_RELOAD_MS - SLOW_REQUEST_MS);
   }, SLOW_REQUEST_MS);
 
   try {
-    let authResult;
-
-    try {
-      authResult = await withTimeout(
-        initialAuthPromise,
-        INITIAL_AUTH_EVENT_TIMEOUT_MS,
-        "초기 로그인 확인 응답이 지연되었습니다.",
-      );
-    } catch (initialError) {
-      logAuthDiagnostic("initial auth event timeout", { error: initialError });
-      renderSignedOut("로그인 연결이 지연되어 한 번 더 확인하는 중입니다.", false);
-      await delay(AUTH_RETRY_DELAY_MS);
-      authResult = await withTimeout(
-        getCurrentSession(),
-        AUTH_TIMEOUT_MS,
-        "로그인 상태 확인 시간이 초과되었습니다.",
-      );
-    }
-
+    const authResult = await withTimeout(
+      getCurrentSession(),
+      AUTH_TIMEOUT_MS,
+      "로그인 상태 확인 시간이 초과되었습니다.",
+    );
     const { session, user } = authResult;
-    logAuthDiagnostic("auth bootstrap", { event: "restoreSession", session, user });
+    logAuthDiagnostic("auth bootstrap", { event: source, session, user });
 
     if (!user) {
       clearAuthAutoReloadFlag();
@@ -271,7 +280,7 @@ async function restoreSession(initialAuthPromise) {
     }
 
     clearAuthAutoReloadFlag();
-    await initAuthenticatedUser(user, "restoreSession");
+    await initAuthenticatedUser(user, source);
   } catch (error) {
     logAuthDiagnostic("auth bootstrap error", { error });
 
@@ -283,6 +292,7 @@ async function restoreSession(initialAuthPromise) {
     renderSignedOut(`${getErrorMessage(error)} Google로 다시 로그인해주세요.`, true);
   } finally {
     window.clearTimeout(slowTimer);
+    window.clearTimeout(reloadTimer);
   }
 }
 
@@ -553,6 +563,7 @@ function isCachedMembership(membership) {
 function resetSignedOutState(message = "선결제 잔액을 불러오려면 Google 계정으로 로그인하세요.") {
   teardownRealtime();
   clearCachedMembership();
+  state.authRestorePromise = null;
   state.authInitUserId = null;
   state.authInitPromise = null;
   state.user = null;
