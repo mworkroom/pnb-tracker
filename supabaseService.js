@@ -1,6 +1,12 @@
-import { canUseAuthStorage, getOAuthRedirectUrl, isSupabaseConfigured, supabase } from "./supabaseClient.js";
+import {
+  canUseAuthStorage,
+  getOAuthRedirectUrl,
+  isSupabaseConfigured,
+  resetSupabaseClient,
+  supabase,
+} from "./supabaseClient.js?v=20260710-auth-fix";
 
-export { canUseAuthStorage, isSupabaseConfigured };
+export { canUseAuthStorage, isSupabaseConfigured, resetSupabaseClient };
 
 const CARD_SELECT = "id, workspace_id, name, first4, last4, color, active, created_at, updated_at";
 const PREPAYMENT_SELECT =

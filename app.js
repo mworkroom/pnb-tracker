@@ -23,16 +23,18 @@ import {
   subscribeToWorkspaceData,
   updateCard,
   updatePrepaymentMemo,
-} from "./supabaseService.js";
+  resetSupabaseClient,
+} from "./supabaseService.js?v=20260710-auth-fix";
 
 const UNREGISTERED_VALUE = "__unregistered__";
 const DEFAULT_UNREGISTERED_COLOR = "#8a8a8a";
-const SLOW_REQUEST_MS = 4000;
+const SLOW_REQUEST_MS = 6000;
 const AUTH_TIMEOUT_MS = 20000;
-const AUTH_STALLED_RELOAD_MS = 8000;
+const AUTH_CLIENT_RECOVERY_MS = 8000;
 const AUTH_AUTO_RELOAD_KEY = "paynowbiz-auth-auto-reload";
 const AUTH_STORAGE_KEY = "paynowbiz-auth";
 const MEMBERSHIP_CACHE_KEY = "paynowbiz-membership";
+const AUTH_RETRY_QUERY_KEY = "auth_retry";
 const ADMIN_CANCELLED_PAGE_SIZE = 20;
 
 const state = {
@@ -63,8 +65,11 @@ const state = {
   realtimeUnsubscribe: null,
   realtimeRefreshTimer: null,
   authRestorePromise: null,
-  authInitUserId: null,
-  authInitPromise: null,
+  authRestoreAttemptId: 0,
+  authRestoreStartedAt: 0,
+  authClientRecoveryCount: 0,
+  authUnsubscribe: null,
+  authLifecycleTimer: null,
 };
 
 const moneyFormat = new Intl.NumberFormat("ko-KR");
@@ -131,18 +136,7 @@ async function init() {
     return;
   }
 
-  onAuthStateChange((event, session) => {
-    logAuthDiagnostic("auth event", { event, session });
-
-    if (event === "SIGNED_OUT") {
-      resetSignedOutState();
-      return;
-    }
-
-    if (!session?.user) return;
-
-    scheduleAuthenticatedUserInit(session.user, event);
-  });
+  bindAuthStateListener();
 
   bindAuthLifecycleEvents();
   await restoreSession("startup");
@@ -221,48 +215,90 @@ function bindEvents() {
   });
 }
 
-function bindAuthLifecycleEvents() {
-  window.addEventListener("pageshow", (event) => {
-    if (event.persisted && !state.user) {
-      void restoreSession("pageshow");
-    }
-  });
+function bindAuthStateListener() {
+  state.authUnsubscribe?.();
+  state.authUnsubscribe = onAuthStateChange(handleAuthStateChange);
+}
 
+function handleAuthStateChange(event, session) {
+  logAuthDiagnostic("auth event", { event, session });
+
+  if (event === "SIGNED_OUT") {
+    resetSignedOutState();
+    return;
+  }
+
+  if (event === "SIGNED_IN" && session?.user && !state.user && !state.authRestorePromise) {
+    void restoreSession("auth:SIGNED_IN", { force: true });
+  }
+}
+
+function bindAuthLifecycleEvents() {
+  const scheduleResumeRecovery = (source) => {
+    window.clearTimeout(state.authLifecycleTimer);
+    state.authLifecycleTimer = window.setTimeout(() => {
+      if (source === "visible" && document.visibilityState !== "visible") return;
+      if (state.user && state.membership) return;
+
+      const isStalled =
+        state.authRestorePromise &&
+        Date.now() - state.authRestoreStartedAt >= AUTH_CLIENT_RECOVERY_MS;
+
+      void restoreSession(source, { force: Boolean(isStalled) });
+    }, 150);
+  };
+
+  window.addEventListener("pageshow", () => scheduleResumeRecovery("pageshow"));
+  window.addEventListener("focus", () => scheduleResumeRecovery("focus"));
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible" && !state.user) {
-      void restoreSession("visible");
-    }
+    if (document.visibilityState === "visible") scheduleResumeRecovery("visible");
   });
 }
 
-function restoreSession(source = "startup") {
-  if (state.authRestorePromise) {
+function restoreSession(source = "startup", options = {}) {
+  const force = options.force === true;
+
+  if (state.authRestorePromise && !force) {
     return state.authRestorePromise;
   }
 
-  state.authRestorePromise = restoreSessionOnce(source).finally(() => {
+  if (
+    state.authRestorePromise &&
+    force &&
+    Date.now() - state.authRestoreStartedAt < AUTH_CLIENT_RECOVERY_MS
+  ) {
+    return state.authRestorePromise;
+  }
+
+  const attemptId = state.authRestoreAttemptId + 1;
+  state.authRestoreAttemptId = attemptId;
+  state.authRestoreStartedAt = Date.now();
+
+  const restorePromise = restoreSessionOnce(source, attemptId).finally(() => {
+    if (state.authRestoreAttemptId !== attemptId) return;
     state.authRestorePromise = null;
+    state.authRestoreStartedAt = 0;
   });
 
-  return state.authRestorePromise;
+  state.authRestorePromise = restorePromise;
+  return restorePromise;
 }
 
-async function restoreSessionOnce(source) {
+async function restoreSessionOnce(source, attemptId) {
   if (!canUseAuthStorage()) {
     renderSignedOut("이 브라우저에서 로그인 저장소를 사용할 수 없습니다. 사이트 데이터/개인정보 보호 설정을 확인해주세요.", true);
     return;
   }
 
   renderSignedOut("로그인 상태를 확인하는 중입니다.", false);
-  let reloadTimer = null;
   const slowTimer = window.setTimeout(() => {
-    renderSignedOut("로그인 확인이 조금 오래 걸리고 있습니다. 자동으로 새로고침합니다.", false);
-    reloadTimer = window.setTimeout(() => {
-      if (!state.user && hasStoredAuthKeySafely()) {
-        tryAuthAutoReload();
-      }
-    }, AUTH_STALLED_RELOAD_MS - SLOW_REQUEST_MS);
+    if (!isCurrentAuthAttempt(attemptId)) return;
+    renderSignedOut("로그인 확인이 조금 오래 걸리고 있습니다. 연결을 다시 시도합니다.", false);
   }, SLOW_REQUEST_MS);
+  const recoveryTimer = window.setTimeout(() => {
+    if (!isCurrentAuthAttempt(attemptId)) return;
+    recoverAuthClient(source, attemptId);
+  }, AUTH_CLIENT_RECOVERY_MS);
 
   try {
     const authResult = await withTimeout(
@@ -270,18 +306,21 @@ async function restoreSessionOnce(source) {
       AUTH_TIMEOUT_MS,
       "로그인 상태 확인 시간이 초과되었습니다.",
     );
+    if (!isCurrentAuthAttempt(attemptId)) return;
     const { session, user } = authResult;
     logAuthDiagnostic("auth bootstrap", { event: source, session, user });
 
     if (!user) {
       clearAuthAutoReloadFlag();
+      clearOAuthCallbackFromUrl();
+      state.authClientRecoveryCount = 0;
       resetSignedOutState(getMissingStoredSessionMessage());
       return;
     }
 
-    clearAuthAutoReloadFlag();
-    await initAuthenticatedUser(user, source);
+    await loadForUser(user, source, attemptId);
   } catch (error) {
+    if (!isCurrentAuthAttempt(attemptId)) return;
     logAuthDiagnostic("auth bootstrap error", { error });
 
     if (hasStoredAuthKeySafely() && tryAuthAutoReload()) {
@@ -292,7 +331,31 @@ async function restoreSessionOnce(source) {
     renderSignedOut(`${getErrorMessage(error)} Google로 다시 로그인해주세요.`, true);
   } finally {
     window.clearTimeout(slowTimer);
-    window.clearTimeout(reloadTimer);
+    window.clearTimeout(recoveryTimer);
+  }
+}
+
+function isCurrentAuthAttempt(attemptId) {
+  return state.authRestoreAttemptId === attemptId;
+}
+
+function recoverAuthClient(source, attemptId) {
+  if (!isCurrentAuthAttempt(attemptId)) return;
+
+  if (state.authClientRecoveryCount < 1) {
+    state.authClientRecoveryCount += 1;
+    logAuthDiagnostic("auth client recovery", { event: source });
+    state.authUnsubscribe?.();
+    state.authUnsubscribe = null;
+    resetSupabaseClient();
+    bindAuthStateListener();
+    void restoreSession(`${source}:client-restart`, { force: true });
+    return;
+  }
+
+  renderSignedOut("로그인 연결이 지연되고 있어 앱을 다시 시작합니다.", false);
+  if (hasStoredAuthKeySafely()) {
+    tryAuthAutoReload();
   }
 }
 
@@ -312,7 +375,9 @@ function tryAuthAutoReload() {
 
     window.sessionStorage.setItem(AUTH_AUTO_RELOAD_KEY, "1");
     window.setTimeout(() => {
-      window.location.reload();
+      const url = new URL(window.location.href);
+      url.searchParams.set(AUTH_RETRY_QUERY_KEY, String(Date.now()));
+      window.location.replace(url.toString());
     }, 250);
     return true;
   } catch {
@@ -377,7 +442,7 @@ function clearOAuthCallbackFromUrl() {
   const url = new URL(window.location.href);
   let changed = false;
 
-  ["code", "state", "error", "error_code", "error_description"].forEach((key) => {
+  ["code", "state", "error", "error_code", "error_description", AUTH_RETRY_QUERY_KEY].forEach((key) => {
     if (url.searchParams.has(key)) {
       url.searchParams.delete(key);
       changed = true;
@@ -408,38 +473,9 @@ function clearOAuthCallbackFromUrl() {
   }
 }
 
-function scheduleAuthenticatedUserInit(user, source) {
-  window.setTimeout(() => {
-    void initAuthenticatedUser(user, source);
-  }, 0);
-}
+async function loadForUser(user, source, attemptId) {
+  if (!isCurrentAuthAttempt(attemptId)) return;
 
-function initAuthenticatedUser(user, source) {
-  if (!user?.id) return Promise.resolve();
-
-  if (state.user?.id === user.id && state.membership) {
-    logAuthDiagnostic("auth init skipped", { event: source, user });
-    clearOAuthCallbackFromUrl();
-    return Promise.resolve();
-  }
-
-  if (state.authInitPromise && state.authInitUserId === user.id) {
-    logAuthDiagnostic("auth init joined", { event: source, user });
-    return state.authInitPromise;
-  }
-
-  logAuthDiagnostic("auth init start", { event: source, user });
-  state.authInitUserId = user.id;
-  state.authInitPromise = loadForUser(user).finally(() => {
-    state.authInitUserId = null;
-    state.authInitPromise = null;
-  });
-
-  return state.authInitPromise;
-}
-
-async function loadForUser(user) {
-  state.user = user;
   clearOAuthCallbackFromUrl();
   const cachedMembership = readCachedMembership(user);
   let openedFromCache = false;
@@ -447,6 +483,7 @@ async function loadForUser(user) {
 
   if (cachedMembership) {
     openedFromCache = true;
+    state.user = user;
     state.membership = cachedMembership;
     showAppShell();
     setupRealtime();
@@ -471,8 +508,9 @@ async function loadForUser(user) {
       "워크스페이스 권한 확인 시간이 초과되었습니다. 새로고침 후 다시 로그인해주세요.",
     );
     logAuthDiagnostic("membership request success", { user, membership });
-    if (state.user?.id !== user.id) return;
+    if (!isCurrentAuthAttempt(attemptId)) return;
     if (!membership) {
+      state.user = null;
       state.membership = null;
       state.data = createEmptyData();
       clearCachedMembership();
@@ -480,18 +518,23 @@ async function loadForUser(user) {
       return;
     }
 
+    state.user = user;
     state.membership = membership;
     writeCachedMembership(user, membership);
     showAppShell();
     setupRealtime();
     await refreshWorkspaceData(openedFromCache ? "" : "Loading", { silent: true });
+    state.authClientRecoveryCount = 0;
+    clearAuthAutoReloadFlag();
   } catch (error) {
     logAuthDiagnostic("membership request error", { user, error });
-    if (state.user?.id !== user.id) return;
+    if (!isCurrentAuthAttempt(attemptId)) return;
     if (openedFromCache) {
       showStatus("저장된 권한으로 앱을 열었습니다. 권한 확인은 다음 실행 때 다시 시도합니다.");
       return;
     }
+    state.user = null;
+    state.membership = null;
     renderSignedOut(getErrorMessage(error), true);
   } finally {
     if (slowTimer) {
@@ -563,9 +606,11 @@ function isCachedMembership(membership) {
 function resetSignedOutState(message = "선결제 잔액을 불러오려면 Google 계정으로 로그인하세요.") {
   teardownRealtime();
   clearCachedMembership();
+  window.clearTimeout(state.authLifecycleTimer);
   state.authRestorePromise = null;
-  state.authInitUserId = null;
-  state.authInitPromise = null;
+  state.authRestoreAttemptId += 1;
+  state.authRestoreStartedAt = 0;
+  state.authClientRecoveryCount = 0;
   state.user = null;
   state.membership = null;
   state.data = createEmptyData();

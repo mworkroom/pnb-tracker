@@ -1,5 +1,5 @@
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
-import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "./supabase.config.js";
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.2/+esm";
+import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "./supabase.config.js?v=20260710-auth-fix";
 
 export const SUPABASE_AUTH_STORAGE_KEY = "paynowbiz-auth";
 
@@ -11,19 +11,37 @@ export const isSupabaseConfigured =
   !SUPABASE_URL.includes("YOUR_SUPABASE_URL") &&
   !SUPABASE_PUBLISHABLE_KEY.includes("YOUR_SUPABASE_PUBLISHABLE_KEY");
 
-export const supabase = isSupabaseConfigured
-  ? createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-      auth: {
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
-        persistSession: true,
-        storageKey: SUPABASE_AUTH_STORAGE_KEY,
-      },
-      global: {
-        fetch: fetchWithTimeout,
-      },
-    })
-  : null;
+function createSupabaseClient() {
+  if (!isSupabaseConfigured) return null;
+
+  return createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+    auth: {
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      persistSession: true,
+      storageKey: SUPABASE_AUTH_STORAGE_KEY,
+      // A suspended iOS web app can leave an auth lock waiting indefinitely.
+      // A bounded wait lets the app rebuild the client and retry instead.
+      lockAcquireTimeout: 5000,
+    },
+    global: {
+      fetch: fetchWithTimeout,
+    },
+  });
+}
+
+export let supabase = createSupabaseClient();
+
+export function resetSupabaseClient() {
+  try {
+    supabase?.auth.stopAutoRefresh();
+  } catch {
+    // The old client may already be suspended or partially initialized.
+  }
+
+  supabase = createSupabaseClient();
+  return supabase;
+}
 
 async function fetchWithTimeout(input, init = {}) {
   const controller = new AbortController();
