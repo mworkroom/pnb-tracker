@@ -376,6 +376,9 @@ select:focus-visible {
 .remaining-line {
   display: block;
   margin-bottom: 12px;
+  background: var(--button-soft);
+  padding: 6px;
+  border-radius: 6px;
 }
 
 .remaining-text {
