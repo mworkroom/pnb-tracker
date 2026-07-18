@@ -1,3 +1,3 @@
-export const SUPABASE_URL = "https://jnyfiggkmbjuiebvbsdk.supabase.co";
-export const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_eOBdwbvPo6T3xPV-8fg-mQ_KqpAfs_Y";
+export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL?.trim() ?? "";
+export const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim() ?? "";
 

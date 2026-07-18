@@ -1,4 +1,4 @@
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.2/+esm";
+import { createClient } from "@supabase/supabase-js";
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "./supabase.config.js?v=20260710-auth-fix";
 
 export const SUPABASE_AUTH_STORAGE_KEY = "paynowbiz-auth";
