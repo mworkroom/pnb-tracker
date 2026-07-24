@@ -273,10 +273,10 @@ h2 {
   justify-content: space-between;
   gap: 8px 12px;
   margin-bottom: 10px;
-  border: 1px solid rgba(37, 183, 232, 0.34);
+  border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 12px 14px;
-  background: var(--accent-soft);
+  background: var(--panel);
   box-shadow: var(--shadow-sm);
   color: var(--text);
 }
