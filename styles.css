@@ -267,6 +267,31 @@ h2 {
   font-size: 0.9rem;
 }
 
+.monthly-card-summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 12px;
+  margin-bottom: 10px;
+  border: 1px solid rgba(37, 183, 232, 0.34);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  background: var(--accent-soft);
+  box-shadow: var(--shadow-sm);
+  color: var(--text);
+}
+
+.monthly-card-summary span {
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
+.monthly-card-summary strong {
+  font-size: 1.08rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
 .balance-list {
   display: grid;
   gap: 9px;

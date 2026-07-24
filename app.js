@@ -25,6 +25,7 @@ import {
   updatePrepaymentMemo,
   resetSupabaseClient,
 } from "./supabaseService.js?v=20260710-auth-fix";
+import { getMonthlyCardPaymentTotal } from "./monthlyCardSummary.js";
 
 const UNREGISTERED_VALUE = "__unregistered__";
 const DEFAULT_UNREGISTERED_COLOR = "#8a8a8a";
@@ -88,6 +89,8 @@ const els = {
   logoutButton: document.querySelector("#logoutButton"),
   adminButton: document.querySelector("#adminButton"),
   saveStatus: document.querySelector("#saveStatus"),
+  hanaMonthlyLabel: document.querySelector("#hanaMonthlyLabel"),
+  hanaMonthlyAmount: document.querySelector("#hanaMonthlyAmount"),
   activeList: document.querySelector("#activeList"),
   completedToggle: document.querySelector("#completedToggle"),
   completedSummary: document.querySelector("#completedSummary"),
@@ -739,11 +742,23 @@ async function handleLogout() {
 function render() {
   if (!state.membership) return;
   const groups = getGroupedPrepayments();
+  renderHanaMonthlySummary();
   renderBalanceList(els.activeList, groups.active);
   renderCompleted(groups.completed);
   renderSearchResults();
   renderArchive();
   applyBusyState();
+}
+
+function renderHanaMonthlySummary() {
+  const now = new Date();
+  const total = getMonthlyCardPaymentTotal(state.data.prepayments, {
+    cardName: "하나카드",
+    now,
+  });
+
+  els.hanaMonthlyLabel.textContent = `${now.getMonth() + 1}월 하나카드 결제액:`;
+  els.hanaMonthlyAmount.textContent = `${formatMoney(total)} 원`;
 }
 
 function getCardSortGroup(card) {
